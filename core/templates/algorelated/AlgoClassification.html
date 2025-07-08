@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Option</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Add Option</h1>
+    <form action="/add_option" method="POST">
+        <label for="algorithm">Algorithm:</label>
+        <input type="text" id="algorithm" name="algorithm" required><br>
+
+        <label for="num_stocks">Number of Stocks:</label>
+        <input type="number" id="num_stocks" name="num_stocks" required><br>
+
+        <label for="expiry_date">Expiry Date:</label>
+        <select id="expiry_date" name="expiry_date" required>
+            <option value="">Select an index first</option>
+        </select><br>
+
+        <label for="option_type">Option Type:</label>
+        <select id="option_type" name="option_type" required>
+            <option value="Call">Call</option>
+            <option value="Put">Put</option>
+        </select><br>
+
+        <label for="underlying_index">Underlying Index:</label>
+        <select id="underlying_index" name="underlying_index" required>
+            {% for index in underlying_indices %}
+                <option value="{{ index.index_id }}">{{ index.index_name }}</option>
+            {% endfor %}
+        </select><br>
+
+        <h3>Entry Conditions:</h3>
+        <div id="entry_conditions">
+            <input type="text" name="entry_condition" required>
+        </div>
+        <button type="button" onclick="addEntryCondition()">Add Another Entry Condition</button><br>
+
+        <h3>Exit Conditions:</h3>
+        <div id="exit_conditions">
+            <input type="text" name="exit_condition" required>
+        </div>
+        <button type="button" onclick="addExitCondition()">Add Another Exit Condition</button><br>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        $(document).ready(function() {
+            $('#underlying_index').change(function() {
+                const indexId = $(this).val();
+                $('#expiry_date').empty(); // Clear existing options
+                $('#expiry_date').append('<option value="">Loading...</option>'); // Loading state
+
+                $.get(`/get_expiry_dates/${indexId}`, function(data) {
+                    $('#expiry_date').empty(); // Clear loading option
+                    if (data.length) {
+                        data.forEach(function(expiry) {
+                            $('#expiry_date').append(`<option value="${expiry.date}">${expiry.date}</option>`);
+                        });
+                    } else {
+                        $('#expiry_date').append('<option value="">No expiry dates available</option>');
+                    }
+                });
+            });
+        });
+
+        function addEntryCondition() {
+            const entryDiv = document.getElementById('entry_conditions');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'entry_condition';
+            entryDiv.appendChild(input);
+        }
+
+        function addExitCondition() {
+            const exitDiv = document.getElementById('exit_conditions');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'exit_condition';
+            exitDiv.appendChild(input);
+        }
+    </script>
+</body>
+</html>

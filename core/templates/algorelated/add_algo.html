@@ -1,0 +1,945 @@
+<!-- Simplified add_algo.html Template with Single Flat Condition Structure -->
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+
+
+
+ <html lang="en">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Add Algo{% endblock %}</title>
+
+  <!-- Bulma CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+
+  <!-- Select2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+  <!-- Optional Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Your custom styles -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+  <!-- jQuery (Only Once) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- jQuery UI (for drag/drop) -->
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+  <!-- Select2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<body>
+
+<section class="section">
+  <div class="container">
+    <h1 class="title">Add New Algorithm</h1>
+    
+<form id="algoForm" method="post">
+  {% csrf_token %}
+  <div class="field">
+    <label class="label">Algorithm Name</label>
+    <input class="input" type="text" name="AlgoName" required>
+  </div>
+
+  <div class="field">
+    <label class="label">Minimum Fund Required</label>
+    <input class="input" type="number" name="Minimum_Fund_Reqd" required>
+  </div>
+
+  <div class="field">
+    <label class="label">Description</label>
+    <textarea class="textarea" name="Algo_description"></textarea>
+  </div>
+
+   <div class="field">
+    <label class="label">Define Constants (User-Defined Variables)</label>
+    <div id="userConstantsContainer"></div>
+    <button type="button" class="button is-small is-info mt-2" onclick="addUserDefinedVariable()">➕ Add Constant</button>
+    <div id="userConstantsList" class="mt-4"></div>
+  </div>
+  
+  <hr>
+  <div id="legsContainer"></div>
+
+  <div class="field mt-4">
+    <button type="button" class="button is-primary" onclick="addLeg()">➕ Add Leg</button>
+  </div>
+
+  <div class="field mt-4">
+    <button type="button" class="button is-info" onclick="showPreview()">👁️ Preview</button>
+    <button type="submit" class="button is-success ml-2">✅ Confirm & Submit</button>
+  </div>
+</form>
+
+<div class="box mt-5" id="jsonPreviewBox" style="display:none">
+  <h2 class="subtitle">🧾 JSON Preview</h2>
+  <pre><code id="jsonPreview"></code></pre>
+  <h2 class="subtitle mt-3">🐍 Python Preview</h2>
+  <pre><code id="pythonPreview"></code></pre>
+</div>
+<style>
+  .nested-condition {
+    border-left: 2px solid #7a7a7a;
+    margin-left: 1rem;
+    padding-left: 1rem;
+    position: relative;
+  }
+  .nested-condition::before {
+    content: "";
+    position: absolute;
+    left: -1.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.4rem;
+    height: 2px;
+    background-color: #7a7a7a;
+  }
+  .condition-row {
+    position: relative;
+    margin-left: 1.5rem;
+  }
+  .condition-row::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -1.4rem;
+    transform: translateY(-50%);
+    width: 1.2rem;
+    height: 1px;
+    background-color: #9999ff;
+  }
+  
+   .constant-item .handle::before {
+    content: '\2630'; /* ☰ */
+    margin-right: 5px;
+    cursor: move;
+    color: #777;
+  }
+
+    .select2-container {
+      min-width: 100%;
+      width: 100% !important;
+    }
+    #userConstantsContainer .expression_builder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+#userConstantsContainer .expression_builder > div {
+  flex: 0 1 auto;
+  min-width: 160px;
+  max-width: 240px;
+}
+
+</style>
+<!-- Select2 CSS -->
+
+
+<script>
+const instruments = {{ instruments_json|safe }};
+const indicators = {{ indicators_json|safe }};
+const all_symbols = {{ symbol_list_json|safe }}; // ✅ Now available globally
+
+function fuzzyMatchScore(symbol, query) {
+  if (!query || !symbol) return 0;
+  if (symbol.includes(query)) return 100;  // strong match
+  let score = 0;
+  let lastIndex = -1;
+  for (let i = 0; i < query.length; i++) {
+    const char = query[i];
+    const index = symbol.indexOf(char, lastIndex + 1);
+    if (index === -1) return 0;
+    score += 10 - (index - lastIndex);  // closer is better
+    lastIndex = index;
+  }
+  return score;
+}
+
+
+  function initSelect2(element, placeholder = "Search...") {
+  if (typeof $ !== 'undefined' && typeof $.fn.select2 !== 'undefined') {
+    $(element).select2({
+      width: 'resolve',
+      placeholder: placeholder,
+      allowClear: true,
+      minimumInputLength: 1,
+      ajax: {
+        delay: 200,
+        transport: function (params, success, failure) {
+          const query = (params.data.q || '').toLowerCase().replace(/[^a-z0-9]/gi, '');
+          if (!query) {
+            success({ results: [] });
+            return;
+          }
+
+          const matches = all_symbols
+            .map(sym => {
+              const normalized = sym.toLowerCase().replace(/[^a-z0-9]/gi, '');
+              return {
+                original: sym,
+                score: fuzzyMatchScore(normalized, query)
+              };
+            })
+            .filter(item => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 50)
+            .map(item => ({
+              id: item.original,
+              text: item.original
+            }));
+
+          success({ results: matches });
+        }
+      }
+    });
+  } else {
+    console.error("Select2 or jQuery not available.");
+  }
+}
+
+function renderConditionVariableParams(selectEl) {
+    const variableName = selectEl.value;
+    const container = selectEl.closest('.condition-row');
+    const paramDiv = container.querySelector('.condition-parameters');
+    paramDiv.innerHTML = '';
+
+    const variable = indicators.find(i => i.name === variableName);
+    if (!variable || !variable.parameters) return;
+
+    variable.parameters.forEach(param => {
+      if (param.name.toLowerCase() === 'symbol') {
+        const symbolSelectId = `cond_symbol_${Date.now()}`;
+        const select = document.createElement('select');
+        select.name = `cond_param_${variableName}_${param.name}`;
+        select.id = symbolSelectId;
+        select.className = 'symbol-dropdown input is-small mt-1';
+        paramDiv.appendChild(select);
+        initSelect2(`#${symbolSelectId}`, "Select symbol");
+      } else {
+        const input = document.createElement('input');
+        input.className = 'input is-small mt-1';
+        input.placeholder = param.name;
+        input.name = `cond_param_${variableName}_${param.name}`;
+        paramDiv.appendChild(input);
+      }
+    });
+  }
+
+  function renderInlineVariableParams(selectEl, index) {
+    const variableName = selectEl.value;
+    const paramTarget = selectEl.closest('.field').querySelector('.parameters');
+    paramTarget.innerHTML = '';
+
+    const variable = indicators.find(i => i.name === variableName);
+    if (!variable || !variable.parameters) return;
+
+    variable.parameters.forEach(param => {
+      if (param.name.toLowerCase() === 'symbol') {
+        const symbolSelectId = `symbol_select_${index}_${Date.now()}`;
+        const symbolDropdown = document.createElement('select');
+        symbolDropdown.name = `const_expr_${index}_${variable.name}_${param.name}`;
+        symbolDropdown.className = 'symbol-dropdown select is-small mt-1';
+        symbolDropdown.id = symbolSelectId;
+        paramTarget.appendChild(symbolDropdown);
+        initSelect2(`#${symbolSelectId}`, "Select symbol");
+      } else {
+        const input = document.createElement('input');
+        input.className = 'input is-small mt-1';
+        input.placeholder = `${param.name}`;
+        input.name = `const_expr_${index}_${variable.name}_${param.name}`;
+        paramTarget.appendChild(input);
+      }
+    });
+  }
+
+function validateExpressionBuilder(index) {
+  const target = document.getElementById(`expression_builder_${index}`);
+  const items = target.querySelectorAll('.expression-item');
+  const errors = [];
+
+  const statusIcon = document.getElementById(`constant_status_${index}`);
+  const previewEl = document.getElementById(`const_preview_${index}`);
+
+  const parts = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const isVariable = item.querySelector('.inline-variable-dropdown');
+    const isOperator = item.querySelector('select') && !isVariable;
+    const isValue = item.querySelector('input') && !isVariable;
+
+    // Validation Rules
+    if (i === 0 && isOperator) {
+      errors.push("❌ Expression cannot start with an operator.");
+    }
+    if (i === items.length - 1 && isOperator) {
+      errors.push("❌ Expression cannot end with an operator.");
+    }
+
+    if ((isValue || isVariable) && i < items.length - 1) {
+      const nextItem = items[i + 1];
+      const nextIsValue = nextItem.querySelector('input') && !nextItem.querySelector('.inline-variable-dropdown');
+      const nextIsVariable = nextItem.querySelector('.inline-variable-dropdown');
+      if (nextIsValue || nextIsVariable) {
+        errors.push("❌ Operator required between two values/variables.");
+      }
+    }
+
+    // Build preview part
+    if (isVariable) {
+      const varName = isVariable.value;
+      const paramEls = item.querySelectorAll('.parameters input, .parameters select');
+      const paramParts = [];
+
+      paramEls.forEach(p => {
+        const key = p.name.split('_').pop();
+        if (p.value) {
+          paramParts.push(`${key}=${p.value}`);
+        }
+      });
+
+      parts.push(`${varName}(${paramParts.join(', ')})`);
+    } else if (isOperator) {
+      parts.push(item.querySelector('select').value);
+    } else if (isValue) {
+      const val = item.querySelector('input').value;
+      if (val) parts.push(val);
+    }
+  }
+
+  // Formula Preview
+  if (previewEl) {
+    previewEl.textContent = parts.join(' ');
+  }
+
+  // Validation Icon
+  if (statusIcon) {
+    statusIcon.innerHTML = errors.length === 0
+      ? `<i class="has-text-success">✅</i>`
+      : `<i class="has-text-danger">❌</i>`;
+  }
+
+  // Error Box
+  let errorBox = document.getElementById(`expr_error_box_${index}`);
+  if (!errorBox) {
+    errorBox = document.createElement('div');
+    errorBox.id = `expr_error_box_${index}`;
+    errorBox.className = "notification is-danger is-light mt-2";
+    target.parentElement.appendChild(errorBox);
+  }
+
+  errorBox.style.display = errors.length ? 'block' : 'none';
+  errorBox.innerHTML = errors.length
+    ? `<strong>Validation Error:</strong><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`
+    : '';
+}
+
+function addUserDefinedVariable() {
+  const container = document.getElementById('userConstantsContainer');
+  const list = document.getElementById('userConstantsList');
+  const index = container.children.length;
+
+  const box = document.createElement('div');
+  box.classList.add('box', 'mb-3');
+  box.id = `user_constant_box_${index}`;
+  box.innerHTML = `
+  <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
+    <strong>Constant Definition</strong>
+    <div class="is-flex is-align-items-center">
+      <span id="constant_status_${index}" class="icon is-small mr-2"></span>
+      <button type="button" class="delete" onclick="removeUserConstant(${index})"></button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="label">Constant Name</label>
+    <input class="input" name="user_constant_name_${index}" placeholder="e.g., Constant1">
+  </div>
+
+  <div id="expression_builder_${index}" class="is-flex is-align-items-center is-flex-wrap-wrap mb-3"></div>
+<span id="constant_status_${index}" class="icon is-small mr-2"></span>
+<p id="const_preview_${index}" class="is-size-7 has-text-grey mt-1 ml-1"></p>
+
+  <div class="buttons mb-2">
+    <button type="button" class="button is-small is-primary" onclick="addExpressionVariable(${index})">➕ Variable</button>
+    <button type="button" class="button is-small is-info" onclick="addExpressionOperator(${index})">➕ Operator</button>
+    <button type="button" class="button is-small is-link" onclick="addExpressionValue(${index})">➕ Value</button>
+  </div>
+
+  <button type="button" class="button is-small is-success" onclick="saveUserConstant(${index})">💾 Save Constant</button>
+`;
+
+  container.appendChild(box);
+
+  const listItem = document.createElement('div');
+  listItem.classList.add('mb-2');
+  listItem.id = `user_constant_list_item_${index}`;
+  listItem.innerHTML = `
+    <span><strong>Constant${index + 1}</strong></span>
+    <button type="button" class="button is-small is-danger ml-2" onclick="removeUserConstant(${index})">Delete</button>
+  `;
+  list.appendChild(listItem);
+}
+
+function removeUserConstant(index) {
+  const box = document.getElementById(`user_constant_box_${index}`);
+  const item = document.getElementById(`user_constant_list_item_${index}`);
+  if (box) box.remove();
+  if (item) item.remove();
+}
+
+function addExpressionVariable(index) {
+  const target = document.getElementById(`expression_builder_${index}`);
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('expression-item');
+
+  wrapper.innerHTML = `
+    <div class="field box p-2 has-background-light">
+      <button class="delete is-small is-pulled-right" onclick="this.closest('.expression-item').remove(); validateExpressionBuilder(${index})"></button>
+      <select class="inline-variable-dropdown" onchange="renderInlineVariableParams(this, ${index}); validateExpressionBuilder(${index})" style="width: 200px;">
+        <option value="">-- Variable --</option>
+        ${indicators.map(i => `<option value="${i.name}">${i.display_name}</option>`).join('')}
+      </select>
+      <div class="parameters mt-1"></div>
+    </div>`;
+  target.appendChild(wrapper);
+  validateExpressionBuilder(index);
+
+  setTimeout(() => {
+    $(wrapper).find('.inline-variable-dropdown').select2({
+      width: '200px',
+      placeholder: "Search variable",
+      allowClear: true
+    });
+  }, 0);
+}
+
+function addExpressionOperator(index) {
+  const target = document.getElementById(`expression_builder_${index}`);
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('expression-item');
+
+  wrapper.innerHTML = `
+    <div class="field box p-2 has-background-light">
+      <button class="delete is-small is-pulled-right" onclick="this.closest('.expression-item').remove(); validateExpressionBuilder(${index})"></button>
+      <div class="select">
+        <select onchange="validateExpressionBuilder(${index})">
+          <option value="+">+</option>
+          <option value="-">-</option>
+          <option value="*">*</option>
+          <option value="/">/</option>
+          <option value="%">%</option>
+        </select>
+      </div>
+    </div>`;
+  target.appendChild(wrapper);
+  validateExpressionBuilder(index);
+}
+
+function addExpressionValue(index) {
+  const target = document.getElementById(`expression_builder_${index}`);
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('expression-item');
+
+  wrapper.innerHTML = `
+    <div class="field box p-2 has-background-light">
+      <button class="delete is-small is-pulled-right" onclick="this.closest('.expression-item').remove(); validateExpressionBuilder(${index})"></button>
+      <input type="number" step="any" placeholder="e.g. 1.5" class="input is-small" oninput="validateExpressionBuilder(${index})">
+    </div>`;
+  target.appendChild(wrapper);
+  validateExpressionBuilder(index);
+}
+
+
+function saveUserConstant(index) {
+  const container = document.getElementById(`expression_builder_${index}`);
+  const nameInput = document.querySelector(`input[name="user_constant_name_${index}"]`);
+  const name = nameInput?.value?.trim();
+
+  if (!name) {
+    alert("Please enter a name for the constant.");
+    nameInput.focus();
+    return;
+  }
+
+  // Re-validate before saving
+  validateExpressionBuilder(index);
+
+  const errorBox = document.getElementById(`expr_error_box_${index}`);
+  if (errorBox && errorBox.style.display !== 'none') {
+    alert("Please fix validation errors before saving.");
+    return;
+  }
+
+  // Build JSON expression
+  const items = container.querySelectorAll('.constant-item');
+  const expression = [];
+  let formulaPreview = "";
+
+  items.forEach(item => {
+    const type = item.getAttribute('data-type');
+    const value = item.getAttribute('data-value');
+    expression.push({ type, value });
+
+    if (type === 'operator') {
+      formulaPreview += ` ${value} `;
+    } else {
+      formulaPreview += `${value}`;
+    }
+  });
+
+  // Save to local JS memory
+  userConstants[index] = { name, expression };
+
+  // Inject hidden input for form submission
+  let hiddenInput = document.getElementById(`user_constant_input_${index}`);
+  if (!hiddenInput) {
+    hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = `user_constant_json_${index}`;
+    hiddenInput.id = `user_constant_input_${index}`;
+    document.getElementById("algoForm").appendChild(hiddenInput);
+  }
+  hiddenInput.value = JSON.stringify({ name, expression });
+
+  // Update preview visually
+  let previewDiv = document.getElementById(`const_preview_${index}`);
+  if (!previewDiv) {
+    previewDiv = document.createElement('div');
+    previewDiv.id = `const_preview_${index}`;
+    previewDiv.className = 'has-text-grey mt-2 is-size-7';
+    container.parentElement.appendChild(previewDiv);
+  }
+  previewDiv.textContent = `Formula: ${formulaPreview}`;
+
+  // Show confirmation message below constant block
+let tempMsg = document.getElementById(`user_constant_saved_msg_${index}`);
+if (!tempMsg) {
+  tempMsg = document.createElement('div');
+  tempMsg.id = `user_constant_saved_msg_${index}`;
+  tempMsg.className = 'has-text-success is-size-7 mt-1';
+  container.parentElement.appendChild(tempMsg);
+}
+tempMsg.innerHTML = `<span class="icon-text">
+  <span class="icon">✅</span>
+  <span>Constant "<strong>${name}</strong>" saved temporarily. Final save when algorithm is submitted.</span>
+</span>`;
+
+}
+
+
+function addLeg() {
+  const container = document.getElementById("legsContainer");
+  const legIndex = document.querySelectorAll(".leg-block").length;
+  const instrumentSelectId = `instrument_select_${legIndex}_${Date.now()}`;
+  const legDiv = document.createElement("div");
+  legDiv.classList.add("box", "leg-block", "mt-5");
+
+  legDiv.innerHTML = `
+    <h2 class="subtitle">Leg ${legIndex + 1}</h2>
+    <div class="field">
+      <label class="label">Instrument</label>
+      <div class="select is-fullwidth">
+        <select id="${instrumentSelectId}" class="instrument-dropdown" name="instrument_name[]" onchange="populateExpiryAndStrike(this, ${legIndex})" required style="width: 100%;">
+          <option value="">--Select--</option>
+          ${instruments.map(i => `<option value="${i.name}">${i.name}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Expiry</label>
+      <div class="select">
+        <select name="expiry_date[]" id="expiry_${legIndex}" required></select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Strike</label>
+      <div class="select">
+        <select name="strike_price[]" id="strike_${legIndex}" required></select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Option Type</label>
+      <div class="select">
+        <select name="option_type[]" required>
+          <option value="CE">Call (CE)</option>
+          <option value="PE">Put (PE)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Order Direction</label>
+      <div class="select">
+        <select name="order_direction[]" required>
+          <option value="BUY">Buy</option>
+          <option value="SELL">Sell</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Order Type</label>
+      <div class="select">
+        <select name="order_type[]" required>
+          <option value="MARKET">Market</option>
+          <option value="LIMIT">Limit</option>
+          <option value="LIMITTHENMARKET">LimitThenMarket</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Entry Conditions</label>
+      <div id="entry_conditions_${legIndex}" class="condition-group"></div>
+      <button type="button" class="button is-small is-link mt-2" onclick="addRootCondition('entry_conditions_${legIndex}', this)">➕ Condition</button>
+    </div>
+
+    <div class="field">
+      <label class="label">Exit Conditions</label>
+      <div id="exit_conditions_${legIndex}" class="condition-group"></div>
+      <button type="button" class="button is-small is-link mt-2" onclick="addRootCondition('exit_conditions_${legIndex}', this)">➕ Condition</button>
+    </div>
+  `;
+
+  container.appendChild(legDiv);
+
+  // Activate Select2 on instrument dropdown
+  setTimeout(() => {
+    $(`#${instrumentSelectId}`).select2({
+      width: '100%',
+      placeholder: "Search symbol",
+      allowClear: true
+    });
+  }, 0);
+}
+
+
+function populateExpiryAndStrike(selectEl, legIndex) {
+  const selected = selectEl.value;
+  const expirySelect = document.getElementById(`expiry_${legIndex}`);
+  const strikeSelect = document.getElementById(`strike_${legIndex}`);
+  const matches = instruments.filter(i => i.name === selected);
+
+  let expiries = new Set();
+  let strikes = new Set();
+
+  matches.forEach(i => {
+    (i.expiries || []).forEach(e => expiries.add(e));
+    (i.strikes || []).forEach(s => strikes.add(s));
+  });
+
+  expirySelect.innerHTML = [...expiries].sort().map(e => `<option value="${e}">${e}</option>`).join('');
+  strikeSelect.innerHTML = [...strikes].sort((a, b) => a - b).map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+function addConditionGroup(containerId) {
+  const container = document.getElementById(containerId);
+  const id = `group_${Math.random().toString(36).substring(2, 8)}`;
+  const div = document.createElement("div");
+  div.classList.add("box", "nested-condition", "mt-3");
+
+  div.innerHTML = `
+    <div class="is-flex is-justify-content-space-between mb-2">
+      <strong>Condition Group</strong>
+      <button type="button" class="delete" onclick="this.closest('.nested-condition').remove()"></button>
+    </div>
+    <div class="field">
+      <label class="label">Connector</label>
+      <div class="select">
+        <select class="group-connector">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+        </select>
+      </div>
+    </div>
+    <div class="conditions" id="${id}"></div>
+    <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow(this)">➕ Add Condition</button>
+  `;
+
+  container.appendChild(div);
+}
+
+function addConditionRow(target) {
+  let container;
+  if (typeof target === 'string') {
+    container = document.getElementById(target);
+  } else {
+    container = target.closest('.nested-condition')?.querySelector('.conditions');
+  }
+  if (!container) return;
+
+  const isWrapped = container.closest('.nested-condition');
+  if (!isWrapped) {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add("box", "nested-condition", "mt-3");
+    const groupId = `group_${Math.random().toString(36).substring(2, 8)}`;
+    wrapper.innerHTML = `
+      <div class="is-flex is-justify-content-space-between mb-2">
+        <strong>Condition Group</strong>
+        <button type="button" class="delete" onclick="this.closest('.nested-condition').remove()"></button>
+      </div>
+      <div class="field">
+        <label class="label">Connector</label>
+        <div class="select">
+          <select class="group-connector">
+            <option value="AND">AND</option>
+            <option value="OR">OR</option>
+          </select>
+          
+        </div>
+      </div>
+      <div class="conditions" id="${groupId}"></div>
+      <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow('${groupId}')">➕ Add Condition</button>
+    `;
+    container.appendChild(wrapper);
+    return;
+  }
+
+  const row = document.createElement("div");
+  row.classList.add("is-flex", "is-align-items-center", "mb-2", "condition-row");
+  row.innerHTML = `
+    <div class="select mr-2">
+      <select class="condition-variable" onchange="renderConditionVariableParams(this)">
+        <option value="">-- Variable --</option>
+        ${indicators.map(i => `<option value="${i.name}">${i.display_name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="condition-parameters mr-2"></div>
+    <div class="select mr-2">
+      <select class="condition-operator">
+        <option value=">">&gt;</option>
+        <option value="<">&lt;</option>
+        <option value=">=">&gt;=</option>
+        <option value="<=">&lt;=</option>
+        <option value="==">==</option>
+        <option value="!=">!=</option>
+      </select>
+    </div>
+    <input class="input mr-2 condition-value" type="text" placeholder="Value" style="width: 150px;">
+    <button type="button" class="delete" onclick="this.parentElement.remove()"></button>
+    <button type="button" class="button is-small is-warning ml-2" onclick="addSubGroupToCondition(this)">➕ Subgroup</button>
+  `;
+  container.appendChild(row);
+}
+
+function addSubGroupToCondition(button) {
+  const parentRow = button.parentElement;
+  if (parentRow.querySelector('.nested-condition')) return;
+
+  const container = document.createElement('div');
+  container.classList.add("nested-condition", "ml-4", "mt-2");
+  const id = `group_${Math.random().toString(36).substring(2, 8)}`;
+
+  container.innerHTML = `
+    <div class="is-flex is-justify-content-space-between mb-2">
+      <strong>Nested Subgroup</strong>
+      <button type="button" class="delete" onclick="removeSubGroup(this)"></button>
+    </div>
+    <div class="field">
+      <label class="label">Connector</label>
+      <div class="select">
+        <select class="group-connector">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+        </select>
+      </div>
+    </div>
+    <div class="conditions" id="${id}"></div>
+    <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow('${id}')">➕ Add Condition</button>
+  `;
+
+  parentRow.appendChild(container);
+  button.style.display = 'none';
+  button.setAttribute('data-original-display', 'true');
+}
+
+function restoreAddSubGroupButton(deleteBtn) {
+  const parent = deleteBtn.closest('.condition-row');
+  const existingButton = parent.querySelector('button[data-original-text]');
+  if (!existingButton) {
+    const btn = document.createElement('button');
+    btn.className = "button is-small is-warning ml-2";
+    btn.textContent = "➕ Subgroup";
+    btn.type = "button";
+    btn.onclick = function() { addSubGroupToCondition(this); };
+    parent.appendChild(btn);
+  }
+}
+
+function removeSubGroup(deleteBtn) {
+  const subgroupDiv = deleteBtn.closest('.nested-condition');
+  const parentRow = subgroupDiv.parentElement;
+  subgroupDiv.remove();
+
+  const addBtn = parentRow.querySelector('button[data-original-display]');
+  if (addBtn) {
+    addBtn.style.display = 'inline-block';
+    addBtn.removeAttribute('data-original-display');
+  } else {
+    const newBtn = document.createElement('button');
+    newBtn.className = "button is-small is-warning ml-2";
+    newBtn.textContent = "➕ Subgroup";
+    newBtn.type = "button";
+    newBtn.onclick = function () { addSubGroupToCondition(this); };
+    parentRow.appendChild(newBtn);
+  }
+}
+function extractConditions(container) {
+  const conditions = [];
+  const rows = container.querySelectorAll('.condition-row');
+  rows.forEach(row => {
+    const variable = row.querySelector('.condition-variable')?.value;
+    const operator = row.querySelector('.condition-operator')?.value;
+    const value = row.querySelector('.condition-value')?.value;
+    const connector = row.querySelector('.condition-connector')?.value || 'AND';
+    if (variable && operator && value !== '') {
+      const cond = {
+        variable_name: variable,
+        operator,
+        value,
+        connector,
+        nested_condition_id: null,
+        children: []
+      };
+      const subgroup = row.querySelector('.nested-condition');
+      if (subgroup) {
+        cond.children = extractConditions(subgroup);
+      }
+      conditions.push(cond);
+    }
+  });
+  return conditions;
+}
+
+function addRootCondition(containerId, button) {
+  const container = document.getElementById(containerId);
+  if (container.querySelector('.nested-condition')) return;
+
+  const div = document.createElement('div');
+  div.classList.add("nested-condition", "mt-2");
+  const id = `group_${Math.random().toString(36).substring(2, 8)}`;
+
+  div.innerHTML = `
+    <div class="is-flex is-justify-content-space-between mb-2">
+      <strong>Condition</strong>
+      <button type="button" class="delete" onclick="removeRootCondition('${containerId}', this)"></button>
+    </div>
+    <div class="field">
+      <label class="label">Connector</label>
+      <div class="select">
+        <select class="group-connector">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+        </select>
+      </div>
+    </div>
+    <div class="conditions" id="${id}"></div>
+    <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow('${id}')">➕ Add Condition</button>
+  `;
+  container.appendChild(div);
+  button.style.display = 'none';
+  button.setAttribute('data-root-btn', 'true');
+}
+
+function removeRootCondition(containerId, deleteBtn) {
+  const block = deleteBtn.closest('.nested-condition');
+  const parent = document.getElementById(containerId);
+  block.remove();
+
+  const existing = parent.parentElement.querySelector('button[data-root-btn]');
+  if (existing) {
+    existing.style.display = 'inline-block';
+    existing.removeAttribute('data-root-btn');
+  } else {
+    const newBtn = document.createElement('button');
+    newBtn.className = "button is-small is-link mt-2";
+    newBtn.textContent = "➕ Condition";
+    newBtn.type = "button";
+    newBtn.onclick = function () { addRootCondition(containerId, this); };
+    parent.appendChild(newBtn);
+  }
+}
+
+
+function renderPythonGroups(groups, indent = 1) {
+  return groups.map(group => renderPython(group, indent)).join('\n');
+}
+
+function renderPython(flatConditions, indent = 1) {
+  const pad = '  '.repeat(indent);
+  let code = '';
+
+  flatConditions.forEach(cond => {
+    code += `${pad}if (${cond.variable_name} ${cond.operator} ${cond.value}) {
+`;
+    if (cond.children.length > 0) {
+      code += renderPython(cond.children, indent + 1);
+    } else {
+      code += `${'  '.repeat(indent + 1)}// action
+`;
+    }
+    code += `${pad}}
+`;
+  });
+
+  return code;
+}
+
+function showPreview() {
+  const legs = document.querySelectorAll('.leg-block');
+  const jsonPreview = document.getElementById('jsonPreview');
+  const pythonPreview = document.getElementById('pythonPreview');
+  const previewBox = document.getElementById('jsonPreviewBox');
+  const results = [];
+  let python = '';
+
+legs.forEach((leg, idx) => {
+    const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
+    const exit = extractConditions(document.getElementById(`exit_conditions_${idx}`));
+    results.push({ leg: idx + 1, entry_conditions: entry, exit_conditions: exit });
+    python += `// Leg ${idx + 1} Entry\n`;
+    python += renderPython(entry, 1);
+    python += `\n// Leg ${idx + 1} Exit\n`;
+    python += renderPython(exit, 1);
+    python += '\n';
+  });
+
+  jsonPreview.textContent = JSON.stringify(results, null, 2);
+  pythonPreview.textContent = python;
+  previewBox.style.display = 'block';
+}
+const form = document.getElementById("algoForm");
+form.addEventListener("submit", function(e) {
+  const legs = document.querySelectorAll('.leg-block');
+  legs.forEach((leg, idx) => {
+    const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
+    const exit = extractConditions(document.getElementById(`exit_conditions_${idx}`));
+    const entryInput = document.createElement('input');
+    entryInput.type = 'hidden';
+    entryInput.name = `entry_conditions_json_${idx}`;
+    entryInput.value = JSON.stringify(entry);
+    form.appendChild(entryInput);
+    const exitInput = document.createElement('input');
+    exitInput.type = 'hidden';
+    exitInput.name = `exit_conditions_json_${idx}`;
+    exitInput.value = JSON.stringify(exit);
+    form.appendChild(exitInput);
+  });
+});
+$(function () {
+  $(document).on('mouseenter', '.constant-builder', function () {
+    $(this).sortable({
+      axis: 'x',
+      items: '> .constant-item',
+      handle: '.handle',
+      placeholder: 'drag-placeholder',
+      tolerance: 'pointer'
+    });
+  });
+});
+
+</script>
+{% endblock %}

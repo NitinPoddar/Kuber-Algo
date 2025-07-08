@@ -1,0 +1,39 @@
+body {
+  background-color: #f3fdf7;
+  font-family: 'Inter', sans-serif;
+}
+
+.button.is-add-leg {
+  background-color: #00795c;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.user-badge {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.5em 0.8em;
+    border-radius: 999px;
+    background-color: #e1f0ff !important;
+    color: #276cda !important;
+    border: 1px solid #b0d2f3;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+<style>
+  .nested-condition {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-left: 3px solid #00d1b2;
+  }
+
+  .nested-condition .nested-condition {
+    margin-left: 1.5rem;
+    border-color: #3273dc; /* darker for sub-level */
+  }
+</style>

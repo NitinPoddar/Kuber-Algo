@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=.5">
+    <title>Add Option</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            
+            background-color: #f8f9fa;
+        }
+        h1 {
+            color: #041A73;
+        }
+        .button {
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-bottom: 10px;
+        }
+        .button.submit {
+            background-color: #28a745; /* Green */
+        }
+        .button.submit:hover {
+            background-color: #218838;
+        }
+        .button.add-condition {
+            background-color: #007bff; /* Blue */
+        }
+        .button.add-condition:hover {
+            background-color: #0069d9;
+        }
+        .button.add-option {
+            background-color: #ffc107; /* Yellow */
+        }
+        .button.add-option:hover {
+            background-color: #e0a800;
+        }
+        .option-group {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #ffffff;
+        }
+        textarea {
+            width: 90%;
+            height: 100px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+            color: #041A73;
+        }
+        select, input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Add Option</h1>
+    <form method="POST" action="{{ url_for('main.submit_option') }}">
+        <label for="algorithm">Algorithm:</label>
+        <input type="text" name="algorithm" id="algorithm" required>
+
+        <div id="options-container">
+            <div class="option-group">
+                <h3>Option 1</h3>
+                <input type="number" name="num_stocks[]" value="1" readonly required>
+                <label for="instrument_name">Select Instrument:</label>
+                <select name="instrument_name[]" required onchange="updateExpiryDates(this)">
+                    <option value="">Select an instrument</option>
+                    <option value="NIFTY">NIFTY</option>
+                    <option value="BANKNIFTY">BANKNIFTY</option>
+                    <option value="BANKEX">BANKEX</option>
+                    <option value="SENSEX">SENSEX</option>
+                </select>
+
+                <label for="expiry_date">Select Expiry Date:</label>
+                <select name="expiry_date[]" required>
+                    <option value="">Select an expiry date</option>
+                </select>
+
+                <label for="strike_price">Strike Price:</label>
+                <select name="strike_price[]" required>
+                    <option value="">Select Strike Price</option>
+                    <option value="Spot">Spot</option>
+                    <option value="SynthSpot">SynthSpot</option>
+                    <option value="OTM">OTM</option>
+                    <option value="Geek">Geek</option>
+                </select>
+
+                <label for="option_type">Option Type:</label>
+                <select name="option_type[]" required>
+                    <option value="CE">CE</option>
+                    <option value="PE">PE</option>
+                </select>
+                
+                <label for="order_type">Order Type:</label>
+                <select name="order_type[]" required>
+                    <option value="Buy">Buy</option>
+                    <option value="Sell">Sell</option>
+                </select>
+                
+                <div>
+                    <h4>Entry Conditions:</h4>
+                    <textarea name="entry_condition[]" placeholder="Enter entry conditions" required></textarea>
+                    <button type="button" class="button add-condition" onclick="addEntryCondition(this)">Add Another Entry Condition</button>
+                </div>
+
+                <div>
+                    <h4>Exit Conditions:</h4>
+                    <textarea name="exit_condition[]" placeholder="Enter exit conditions" required></textarea>
+                    <button type="button" class="button add-condition" onclick="addExitCondition(this)">Add Another Exit Condition</button>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="button add-option" onclick="addOption()">Add Another Option</button>
+        <button type="submit" class="button submit" onclick="setNumStocks()">Submit</button>
+    </form>
+
+    <script>
+        const instruments = {
+            {% for instrument in instruments %}
+                '{{ instrument.name }}': {{ instrument.expiry | tojson }},
+            {% endfor %}
+        };
+
+        function updateExpiryDates(selectElement) {
+            const selectedInstrument = selectElement.value;
+            const expirySelect = selectElement.closest('.option-group').querySelector('select[name="expiry_date[]"]');
+
+            expirySelect.innerHTML = '<option value="">Select an expiry date</option>';
+
+            if (selectedInstrument && instruments[selectedInstrument]) {
+                instruments[selectedInstrument].forEach(function(expiry) {
+                    const option = document.createElement('option');
+                    option.value = expiry;
+                    option.textContent = expiry;
+                    expirySelect.appendChild(option);
+                });
+            }
+        }
+
+        function addOption() {
+            const optionsContainer = document.getElementById('options-container');
+            const optionCount = optionsContainer.children.length + 1;
+
+            const newOptionDiv = document.createElement('div');
+            newOptionDiv.className = 'option-group';
+            newOptionDiv.innerHTML = `
+                <h3>Option ${optionCount}</h3>
+                <input type="number" name="num_stocks[]" value="${optionCount}" readonly required>
+                <label for="instrument_name">Select Instrument:</label>
+                <select name="instrument_name[]" required onchange="updateExpiryDates(this)">
+                    <option value="">Select an instrument</option>
+                    <option value="NIFTY">NIFTY</option>
+                    <option value="BANKNIFTY">BANKNIFTY</option>
+                    <option value="BANKEX">BANKEX</option>
+                    <option value="SENSEX">SENSEX</option>
+                </select>
+
+                <label for="expiry_date">Select Expiry Date:</label>
+                <select name="expiry_date[]" required>
+                    <option value="">Select an expiry date</option>
+                </select>
+
+                <label for="strike_price">Strike Price:</label>
+                <select name="strike_price[]" required>
+                    <option value="">Select Strike Price</option>
+                    <option value="Spot">Spot</option>
+                    <option value="SynthSpot">SynthSpot</option>
+                    <option value="OTM">OTM</option>
+                    <option value="Geek">Geek</option>
+                </select>
+
+                <label for="option_type">Option Type:</label>
+                <select name="option_type[]" required>
+                    <option value="CE">CE</option>
+                    <option value="PE">PE</option>
+                </select>
+                
+                <label for="order_type">Order Type:</label>
+                <select name="order_type[]" required>
+                    <option value="Buy">Buy</option>
+                    <option value="Sell">Sell</option>
+                </select>
+                
+                <div>
+                    <h4>Entry Conditions:</h4>
+                    <textarea name="entry_condition[]" placeholder="Enter entry conditions" required></textarea>
+                    <button type="button" class="button add-condition" onclick="addEntryCondition(this)">Add Another Entry Condition</button>
+                </div>
+
+                <div>
+                    <h4>Exit Conditions:</h4>
+                    <textarea name="exit_condition[]" placeholder="Enter exit conditions" required></textarea>
+                    <button type="button" class="button add-condition" onclick="addExitCondition(this)">Add Another Exit Condition</button>
+                </div>
+            `;
+
+            optionsContainer.appendChild(newOptionDiv);
+        }
+
+        function setNumStocks() {
+    const optionsContainer = document.getElementById('options-container');
+    document.getElementsByName('num_stocks[]').forEach((input, index) => {
+        input.value = index + 1; // Ensure each num_stocks is set correctly
+    });
+}
+
+
+        function addEntryCondition(button) {
+            const newEntryCondition = document.createElement('textarea');
+            newEntryCondition.name = 'entry_condition[]';
+            newEntryCondition.placeholder = 'Enter entry condition';
+            newEntryCondition.required = true;
+            button.parentNode.insertBefore(newEntryCondition, button);
+        }
+
+        function addExitCondition(button) {
+            const newExitCondition = document.createElement('textarea');
+            newExitCondition.name = 'exit_condition[]';
+            newExitCondition.placeholder = 'Enter exit condition';
+            newExitCondition.required = true;
+            button.parentNode.insertBefore(newExitCondition, button);
+        }
+        
+        function mergeConditions() {
+            const optionsContainer = document.getElementById('options-container');
+            const entryConditions = [];
+            const exitConditions = [];
+
+            optionsContainer.querySelectorAll('.option-group').forEach(optionGroup => {
+                const entryConditionElements = optionGroup.querySelectorAll('textarea[name="entry_condition[]"]');
+                const exitConditionElements = optionGroup.querySelectorAll('textarea[name="exit_condition[]"]');
+
+                const mergedEntryConditions = Array.from(entryConditionElements).map(elem => elem.value).filter(Boolean);
+                const mergedExitConditions = Array.from(exitConditionElements).map(elem => elem.value).filter(Boolean);
+
+                entryConditions.push(JSON.stringify(mergedEntryConditions));
+                exitConditions.push(JSON.stringify(mergedExitConditions));
+            });
+
+            const entryConditionInput = document.createElement('input');
+            entryConditionInput.type = 'hidden';
+            entryConditionInput.name = 'merged_entry_conditions';
+            entryConditionInput.value = JSON.stringify(entryConditions);
+
+            const exitConditionInput = document.createElement('input');
+            exitConditionInput.type = 'hidden';
+            exitConditionInput.name = 'merged_exit_conditions';
+            exitConditionInput.value = JSON.stringify(exitConditions);
+
+            document.forms[0].appendChild(entryConditionInput);
+            document.forms[0].appendChild(exitConditionInput);
+        }
+
+        // Update the form submit button to call mergeConditions
+        document.querySelector('.button.submit').onclick = function(event) {
+            event.preventDefault(); // Prevent the default form submission
+            setNumStocks(); // Set the num_stocks
+            mergeConditions(); // Merge entry and exit conditions
+            document.forms[0].submit(); // Now submit the form
+        };
+    </script>
+</body>
+</html>

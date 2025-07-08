@@ -1,0 +1,59 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-5-desktop is-8-tablet">
+        <div class="box">
+          <h3 class="title has-text-centered is-4 has-text-primary">Login</h3>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="notification is-danger is-light">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <form method="POST" action="{% url 'login' %}">
+            {% csrf_token %}
+
+            <div class="field">
+              <label class="label">Username or Email</label>
+              <div class="control">
+                <input class="input is-medium" type="text" name="username" placeholder="Enter your username or email" required autofocus>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Password</label>
+              <div class="control">
+                <input class="input is-medium" type="password" name="password" placeholder="Enter your password" required>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input type="checkbox" name="remember"> Remember me
+              </label>
+            </div>
+
+            <div class="field mt-4">
+              <button class="button is-link is-medium is-fullwidth">
+                Login
+              </button>
+            </div>
+
+            <p class="has-text-centered mt-4">
+              Don't have an account?
+              <a href="{% url 'signup' %}">Sign up now</a>
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

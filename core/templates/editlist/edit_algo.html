@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Algorithm</title>
+</head>
+<body>
+    <h1>Edit Algorithm</h1>
+    
+    <form method="post">
+        <label for="AlgoName">Algorithm Name:</label>
+        <input type="text" id="AlgoName" name="AlgoName" value="{{ algo.AlgoName }}" required><br><br>
+        
+        <label for="Minimum_Fund_Reqd">Minimum Fund Required:</label>
+        <input type="number" id="Minimum_Fund_Reqd" name="Minimum_Fund_Reqd" value="{{ algo.Minimum_Fund_Reqd }}" required><br><br>
+        
+        <label for="Algo_description">Algo Description:</label><br>
+        <textarea id="Algo_description" name="Algo_description" rows="4" cols="50" required>{{ algo.Algo_description }}</textarea><br><br>
+        
+        <label for="Algo_logic">Algorithm Logic:</label><br>
+        <textarea id="Algo_logic" name="Algo_logic" rows="4" cols="50" required>{{ algo.Algo_logic }}</textarea><br><br>
+        
+        <button type="submit">Update Algorithm</button>
+    </form>
+</body>
+</html>

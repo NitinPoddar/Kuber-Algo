@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conditional Code Builder</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+    }
+    .code-line {
+        margin-bottom: 10px;
+    }
+    .operator-dropdown, .variable-dropdown {
+        padding: 5px;
+        font-size: 14px;
+    }
+</style>
+</head>
+<body>
+<div class="column is-5 is-offset-4">
+    <h3 class="title">Build Algo</h3>
+    <div class="box">
+	        <div class="select is-large">
+                    <select id="SelectSegment" name="SelectSegment" required>
+                        <option value="" selected disabled>Segment</option>
+                        {% for Segment in Segments %}
+                            <option value="{{ Segment.Name }}">{{ Segment.Name}}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+	
+    <div id="code-builder">
+        <!-- Initial code line -->
+	
+        <div class="code-line">
+            <select class="variable-dropdown">
+                <option value="variable1">variable1</option>
+                <option value="variable2">variable2</option>
+                <!-- Add more options as needed -->
+            </select>
+            <select class="operator-dropdown">
+                <option value="==">==</option>
+                <option value="!=">!=</option>
+                <option value=">">></option>
+                <option value="<"><</option>
+                <!-- Add more operators as needed -->
+            </select>
+            <input type="text" class="value-input" placeholder="Enter value">
+        </div>
+    </div>
+</div>
+</div>
+
+    <button id="add-line-btn">Add Line</button>
+    <button id="generate-code-btn">Generate Code</button>
+
+    <script>
+        // Function to add a new code line
+        function addCodeLine() {
+            var codeBuilder = document.getElementById('code-builder');
+            var newLine = document.createElement('div');
+            newLine.className = 'code-line';
+            newLine.innerHTML = `
+                <select class="variable-dropdown">
+                    <option value="variable1">variable1</option>
+                    <option value="variable2">variable2</option>
+                    <!-- Add more options as needed -->
+                </select>
+                <select class="operator-dropdown">
+                    <option value="==">==</option>
+                    <option value="!=">!=</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <!-- Add more operators as needed -->
+                </select>
+                <input type="text" class="value-input" placeholder="Enter value">
+            `;
+            codeBuilder.appendChild(newLine);
+        }
+
+        // Function to generate the code based on current selections
+        function generateCode() {
+            var codeLines = document.querySelectorAll('.code-line');
+            var generatedCode = '';
+            codeLines.forEach(function(line, index) {
+                var variable = line.querySelector('.variable-dropdown').value;
+                var operator = line.querySelector('.operator-dropdown').value;
+                var value = line.querySelector('.value-input').value;
+                if (index > 0) {
+                    generatedCode += ' && '; // Or any other logical connector
+                }
+                generatedCode += `${variable} ${operator} ${value}`;
+            });
+            console.log('Generated code:', generatedCode);
+            // You can do further processing with the generated code, like sending it to a server or displaying it.
+        }
+
+        // Event listeners for buttons
+        document.getElementById('add-line-btn').addEventListener('click', addCodeLine);
+        document.getElementById('generate-code-btn').addEventListener('click', generateCode);
+    </script>
+</body>
+</html>

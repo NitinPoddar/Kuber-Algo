@@ -1,0 +1,62 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="column is-4 is-offset-4">
+      <h3 class="title has-text-centered">Add Broker</h3>
+
+      <form method="POST" action="{% url 'add_broker' %}">
+        {% csrf_token %}
+
+        <div class="field">
+          <div class="control">
+            <input class="input is-large" type="text" name="BrokerName" placeholder="Broker Name" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="control">
+            <input class="input is-large" type="text" name="RootAPI" placeholder="Root API" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="control">
+            <input class="input is-large" type="text" name="ServerIP" placeholder="Server IP" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="AuthenticatorReq" class="label">Authenticator Required:</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="AuthenticatorReq" name="AuthenticatorReq" required>
+                <option value="1">1</option>
+                <option value="0">0</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="PasswordReq" class="label">Password Required:</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="PasswordReq" name="PasswordReq" required>
+                <option value="1">1</option>
+                <option value="0">0</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="button is-block is-info is-large is-fullwidth mt-4" style="background-color: #041A73;">
+          Add Broker
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

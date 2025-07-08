@@ -1,0 +1,175 @@
+{% extends "core/base.html" %}
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<style>
+    .code-editor {
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #f5f5f5;
+        font-family: 'Courier New', Courier, monospace;
+        padding: 10px;
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    .code-editor textarea {
+        width: calc(100% - 60px); /* Adjust width minus line numbers width */
+        height: 400px; /* Adjust height as needed */
+        border: none;
+        background: none;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        color: #333;
+        resize: none;
+        padding-left: 60px; /* Ensure space for line numbers */
+    }
+
+    .line-numbers {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        bottom: 10px;
+        width: 50px; /* Adjust width as needed */
+        overflow-y: scroll;
+        pointer-events: none; /* Prevent blocking text selection */
+    }
+
+    .line-numbers span {
+        display: block;
+        color: #999;
+        text-align: right;
+        padding-right: 5px;
+        user-select: none; /* Prevent text selection */
+    }
+</style>
+
+<div class="column is-8 is-offset-2">
+    <h3 class="title">Add New Algo</h3>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <form method="POST" action="/add_algo" id="add_algo_form">
+        <div class="field">
+            <div class="control">
+                <input class="input is-large" type="text" name="AlgoName" id="AlgoName" placeholder="Algo Name" autofocus="">
+                <span id="algo_name_error" style="color: red;"></span><br><br>
+            </div>
+        </div>
+
+        <div class="field">
+            <div class="control">
+                <input class="input is-large" type="number" name="Minimum_Fund_Reqd" placeholder="Minimum fund required" autofocus="">
+            </div>
+        </div>
+        
+        <div class="field">
+            <label class="label">Algo Description:</label>
+            <textarea class="textarea" id="Algo_description" name="Algo_description" rows="5" required></textarea>
+        </div>
+
+        <div class="field">
+            <label class="label">Algo Code:</label>
+            <div class="code-editor">
+                <div class="line-numbers" id="line-numbers"></div>
+                <textarea class="textarea" id="Algo_logic" name="Algo_logic" rows="10" required></textarea>
+            </div>
+        </div>
+
+        <!-- Code editor-like text areas -->
+        <div class="field">
+            <label class="label">LegDetails:</label>
+            <div class="code-editor">
+                <div class="line-numbers"></div>
+                <textarea class="textarea" id="LegDetails" name="LegDetails" placeholder="Enter LegDetails code here..." required></textarea>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label">Entry:</label>
+            <div class="code-editor">
+                <div class="line-numbers"></div>
+                <textarea class="textarea" id="Entry" name="Entry" placeholder="Enter Entry code here..." required></textarea>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label">Continuous Checks:</label>
+            <div class="code-editor">
+                <div class="line-numbers"></div>
+                <textarea class="textarea" id="ContinuousChecks" name="ContinuousChecks" placeholder="Enter Continuous Checks code here..." required></textarea>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="label">Exit Conditions:</label>
+            <div class="code-editor">
+                <div class="line-numbers"></div>
+                <textarea class="textarea" id="ExitConditions" name="ExitConditions" placeholder="Enter Exit Conditions code here..." required></textarea>
+            </div>
+        </div>
+
+        <button type="submit" class="button is-primary" style="background-color: #041A73;">Add Algo</button>
+    </form>
+</div>
+
+<span id="algo_name_success" style="color: green;"></span>
+
+<script>
+    $(document).ready(function() {
+        $('#AlgoName').on('blur', function() {
+            var algoName = $(this).val();
+            $.ajax({
+                type: 'POST',
+                url: '/add_algo',
+                data: { AlgoName: algoName },
+                success: function(response) {
+                    if (response.status === 'error') {
+                        $('#algo_name_error').text(response.message);
+                        $('#AlgoName').focus();
+                    } else if (response.status === 'success') {
+                        $('#algo_name_error').text(response.message).css('color', 'green');
+                        $('#algo_name_success').text(response.message).css('color', 'green');
+                    }
+                },
+                error: function(xhr, textStatus, errorThrown) {
+                    console.log('XHR status:', xhr.status);
+                    console.log('Response:', xhr.responseText);
+                    if (xhr.status === 400) {
+                        $('#algo_name_error').text(xhr.responseJSON.message);
+                    } else {
+                        $('#algo_name_error').text('An error occurred while checking the name.');
+                    }
+                }            
+            });
+        });
+
+        // Add line numbers to code editor textareas
+        function updateLineNumbers(editor) {
+            var lines = editor.value.split('\n').length;
+            var lineNumbersWrapper = editor.parentNode.querySelector('.line-numbers');
+            lineNumbersWrapper.innerHTML = '';
+            for (var i = 1; i <= lines; i++) {
+                var line = document.createElement('span');
+                line.textContent = i;
+                lineNumbersWrapper.appendChild(line);
+            }
+        }
+
+        var codeEditors = document.querySelectorAll('.code-editor textarea');
+        codeEditors.forEach(function(editor) {
+            updateLineNumbers(editor);
+            editor.addEventListener('input', function() {
+                updateLineNumbers(editor);
+            });
+        });
+    });
+</script>
+
+{% endblock %}

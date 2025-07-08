@@ -1,0 +1,29 @@
+<!-- userform.html -->
+<form id="AlgoForm" method="POST" action="/userform">
+    <label for="Algoname">Algoname:</label>
+<br>
+    <label for="MinimumFundRequirement">Minimum fund required per lot size:</label>
+<br>
+    <label for="SelectLotSize">Invest in Lot Size:</label>
+  <input type="numeric" id="SelectLotSize" name="LotSize:" required>
+<br>
+    <label for="SelectBroker">Select Broker:</label>
+ 	<select id="SelectBroker" name="Select Broker:">
+        <option value="Wisdom Capital">Wisdom Capital</option>
+        <option value="Zerodha">Zerodha</option>
+        <option value="5 Paisa">5 Paisa</option>
+        <option value="Angel One">Angel One</option>
+    </select>
+<br> 
+ <label for="BrokerClientID">Broker Client Id:</label>
+  <input type="Text" id="BrokerClientID" name="Broker Client Id:" required>
+<br>  
+<label for="ClientAPIKey">Broker API Key:</label>
+  <input type="text" id="SelectLotSize" name="Broker API Key:" required>
+<br>
+  <label for="ClientSecretKey">Broker Secret Key:</label>
+  <input type="text" id="ClientSecretKey" name="Broker Secret Key:" required>
+    	    
+    <br><br>
+    <input type="submit" value="Activate">
+</form>

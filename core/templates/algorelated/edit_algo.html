@@ -1,0 +1,109 @@
+{% extends "core/base.html" %}
+{% load custom_filters %}  {# Ensure this includes get_attr filter #}
+{% load widget_tweaks %}
+{% block title %}Edit Algorithm | Kuber{% endblock %}
+
+{% block content %}
+<h1 class="title is-4">Edit Algorithm: {{ algo.algo_name }}</h1>
+
+<form method="POST" action="{% url 'edit_algo' algo.id %}">
+  {% csrf_token %}
+
+  <!-- Render Algo Metadata -->
+  <div class="field">
+    <label class="label">Algorithm Name</label>
+    <div class="control">
+      {{ form.algo_name|add_class:"input" }}
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="label">Minimum Fund Required</label>
+    <div class="control">
+      {{ form.minimum_fund_reqd|add_class:"input" }}
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="label">Description</label>
+    <div class="control">
+      {{ form.algo_description|add_class:"textarea" }}
+    </div>
+  </div>
+
+  <hr>
+  <h2 class="title is-5">Logic Legs</h2>
+  <div id="logic-rows">
+    {% for logic in logic_entries %}
+      <div class="box logic-row">
+        <input type="hidden" name="logic_id[]" value="{{ logic.id }}">
+
+        {% for field in field_names %}
+          <div class="field">
+            <label class="label">{{ field|cut:"_"|title }}</label>
+            <div class="control">
+              {% if field == "entry_condition" or field == "exit_condition" %}
+                <textarea class="textarea" name="{{ field }}[]">{{ logic|get_attr:field }}</textarea>
+
+              {% elif field == "option_type" %}
+                <div class="select is-fullwidth">
+                  <select name="option_type[]">
+                    {% for opt in "Call,Put"|cut:"," %}
+                      <option value="{{ opt }}" {% if logic|get_attr:field == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+              {% elif field == "order_type" %}
+                <div class="select is-fullwidth">
+                  <select name="order_type[]">
+                    {% for opt in "Market,Limit"|cut:"," %}
+                      <option value="{{ opt }}" {% if logic|get_attr:field == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+              {% else %}
+                <input class="input is-small" type="text" name="{{ field }}[]" value="{{ logic|get_attr:field }}">
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+        <button type="button" class="button is-danger is-small mt-2" onclick="removeLogicRow(this)">Remove leg</button>
+      </div>
+    {% empty %}
+      <p>No existing logic legs.</p>
+    {% endfor %}
+  </div>
+
+  <button type="button" class="button is-link is-light mt-3" onclick="addLogicRow()">➕ Add New Leg</button>
+
+  <div class="field mt-5">
+    <button type="submit" class="button is-primary">Save All Changes</button>
+    <a class="button is-light" href="{% url 'algo_list' %}">Cancel</a>
+  </div>
+</form>
+
+<script>
+function emptyRowHtml() {
+  return `
+    <div class="box logic-row">
+      <input type="hidden" name="logic_id[]" value="">
+      <div class="field"><label class="label">Instrument Name</label><div class="control"><input class="input is-small" type="text" name="instrument_name[]" required></div></div>
+      <div class="field"><label class="label">Expiry Date</label><div class="control"><input class="input is-small" type="text" name="expiry_date[]" required></div></div>
+      <div class="field"><label class="label">Strike Price</label><div class="control"><input class="input is-small" type="text" name="strike_price[]" required></div></div>
+      <div class="field"><label class="label">Option Type</label><div class="control"><div class="select is-fullwidth"><select name="option_type[]"><option value="Call">Call</option><option value="Put">Put</option></select></div></div></div>
+      <div class="field"><label class="label">Order Type</label><div class="control"><div class="select is-fullwidth"><select name="order_type[]"><option value="Market">Market</option><option value="Limit">Limit</option></select></div></div></div>
+      <div class="field"><label class="label">Entry Condition</label><div class="control"><textarea class="textarea" name="entry_condition[]"></textarea></div></div>
+      <div class="field"><label class="label">Exit Condition</label><div class="control"><textarea class="textarea" name="exit_condition[]"></textarea></div></div>
+      <button type="button" class="button is-danger is-small mt-2" onclick="removeLogicRow(this)">Remove leg</button>
+    </div>`;
+}
+function addLogicRow() {
+  document.getElementById('logic-rows').insertAdjacentHTML('beforeend', emptyRowHtml());
+}
+function removeLogicRow(btn) {
+  btn.closest('.logic-row').remove();
+}
+</script>
+{% endblock %}

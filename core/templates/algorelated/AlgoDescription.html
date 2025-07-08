@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options</title>
+</head>
+<body>
+    <h1>Options</h1>
+    <table>
+        <tr>
+            <th>Algorithm</th>
+            <th>Number of Stocks</th>
+            <th>Expiry Date</th>
+            <th>Option Type</th>
+            <th>Underlying Index</th>
+            <th>Entry Conditions</th>
+            <th>Exit Conditions</th>
+        </tr>
+        {% for option in options %}
+        <tr>
+            <td>{{ option.algorithm }}</td>
+            <td>{{ option.num_stocks }}</td>
+            <td>{{ option.expiry_date }}</td>
+            <td>{{ option.option_type }}</td>
+            <td>{{ option.underlying_index }}</td>
+            <td>
+                {% for condition in option.conditions %}
+                    {% if condition.condition_type == 'entry' %}
+                        {{ condition.condition_text }}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
+            <td>
+                {% for condition in option.conditions %}
+                    {% if condition.condition_type == 'exit' %}
+                        {{ condition.condition_text }}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/">Add Another Option</a>
+</body>
+</html>
