@@ -15,4 +15,7 @@ urlpatterns = [
     path('build-algo/', views.build_algo, name='build_algo'),
     path('api/instruments/grouped/', views.get_grouped_instruments, name='get_grouped_instruments'),
     path('insert-instruments/', views.insert_instruments, name='insert_instruments'),
+    path('api/user_variable/save/', views.save_user_variable, name='save_user_variable'),
+    path('api/user_variable/delete/', views.delete_user_variable, name='delete_user_variable'),
+    path('check_algo_name/', views.check_algo_name, name='check_algo_name'),
 ]

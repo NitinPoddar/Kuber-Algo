@@ -39,40 +39,56 @@
     
 <form id="algoForm" method="post">
   {% csrf_token %}
-  <div class="field">
-    <label class="label">Algorithm Name</label>
-    <input class="input" type="text" name="AlgoName" required>
+
+  <!-- SECTION 1 -->
+  <div id="basicDetailsSection">
+    <div class="field">
+      <label class="label">Algorithm Name <span class="has-text-danger">*</span></label>
+      <input class="input" type="text" name="AlgoName" id="AlgoName" required>
+      <p class="help is-danger" id="algoNameError" style="display: none;">Algorithm name is required.</p>
+    </div>
+
+    <div class="field">
+      <label class="label">Minimum Fund Required <span class="has-text-danger">*</span></label>
+      <input class="input" type="number" name="Minimum_Fund_Reqd" id="MinimumFund" required>
+      <p class="help is-danger" id="fundError" style="display: none;">Minimum fund is required.</p>
+    </div>
+
+    <div class="field">
+      <label class="label">Description</label>
+      <textarea class="textarea" name="Algo_description"></textarea>
+    </div>
+
+    <div class="field mt-4">
+      <button type="button" class="button is-primary" id="defineStrategyBtn" disabled onclick="showStrategySection()">🚀 Define Strategy</button>
+    </div>
   </div>
 
-  <div class="field">
-    <label class="label">Minimum Fund Required</label>
-    <input class="input" type="number" name="Minimum_Fund_Reqd" required>
-  </div>
+  <!-- SECTION 2: Initially Hidden -->
+  <div id="strategySection" style="display: none;">
+    <hr>
 
-  <div class="field">
-    <label class="label">Description</label>
-    <textarea class="textarea" name="Algo_description"></textarea>
-  </div>
+    <div class="field">
+      <label class="label">Define Variables (User-Defined Variables)</label>
+      <div id="userConstantsContainer"></div>
+      <button type="button" class="button is-small is-info mt-2" onclick="addUserDefinedVariable()">➕ Add Variable</button>
+    </div>
 
-   <div class="field">
-    <label class="label">Define Constants (User-Defined Variables)</label>
-    <div id="userConstantsContainer"></div>
-    <button type="button" class="button is-small is-info mt-2" onclick="addUserDefinedVariable()">➕ Add Constant</button>
-    <div id="userConstantsList" class="mt-4"></div>
-  </div>
-  
-  <hr>
-  <div id="legsContainer"></div>
+    <hr>
+    <div id="legsContainer"></div>
 
-  <div class="field mt-4">
-    <button type="button" class="button is-primary" onclick="addLeg()">➕ Add Leg</button>
-  </div>
+    <div class="field mt-4">
+      <button type="button" class="button is-primary" onclick="addLeg()">➕ Add Leg</button>
+    </div>
 
-  <div class="field mt-4">
-    <button type="button" class="button is-info" onclick="showPreview()">👁️ Preview</button>
-    <button type="submit" class="button is-success ml-2">✅ Confirm & Submit</button>
+    <div class="field mt-4">
+      <button type="button" class="button is-info" onclick="showPreview()">👁️ Preview</button>
+      <button type="submit" class="button is-success ml-2">✅ Confirm & Submit</button>
+    </div>
   </div>
 </form>
+
+<p id="const_preview_${index}" class="is-size-7 has-text-grey mt-1 ml-1"></p>
 
 <div class="box mt-5" id="jsonPreviewBox" style="display:none">
   <h2 class="subtitle">🧾 JSON Preview</h2>
@@ -130,13 +146,45 @@
   align-items: flex-start;
 }
 
-#userConstantsContainer .expression_builder > div {
-  flex: 0 1 auto;
-  min-width: 160px;
-  max-width: 240px;
+.condition-row.highlight-red {
+  border: 2px dashed red;
+  background-color: #fff0f0;
+}
+
+
+#userConstantsContainer .is-size-7 {
+  font-style: italic;
+  background-color: #f4f4f4;
+  padding: 0.25rem 0.5rem;
+  border-left: 3px solid #00c4a7;
+}
+
+#userConstantsContainer .field,
+#userConstantsContainer .expression_builder,
+#userConstantsContainer .buttons {
+  transition: all 0.3s ease;
 }
 
 </style>
+
+<div class="modal" id="varInUseModal">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Cannot Delete Variable</p>
+      <button class="delete" aria-label="close" onclick="closeVarInUseModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <p class="has-text-danger">❌ This variable is currently being used in one or more condition rows.</p>
+      <p>Please remove it from those rows before deleting.</p>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button" onclick="closeVarInUseModal()">OK</button>
+    </footer>
+  </div>
+</div>
+
+
 <!-- Select2 CSS -->
 
 
@@ -144,6 +192,8 @@
 const instruments = {{ instruments_json|safe }};
 const indicators = {{ indicators_json|safe }};
 const all_symbols = {{ symbol_list_json|safe }}; // ✅ Now available globally
+//const userDefinedVariables = {{ user_vars_json|safe }};
+let userDefinedVariables = [];  // ✅ allows reassignment
 
 function fuzzyMatchScore(symbol, query) {
   if (!query || !symbol) return 0;
@@ -203,32 +253,55 @@ function fuzzyMatchScore(symbol, query) {
 }
 
 function renderConditionVariableParams(selectEl) {
-    const variableName = selectEl.value;
-    const container = selectEl.closest('.condition-row');
-    const paramDiv = container.querySelector('.condition-parameters');
-    paramDiv.innerHTML = '';
+  const variableName = selectEl.value;
+  const container = selectEl.closest('.condition-row');
+  const paramDiv = container.querySelector('.condition-parameters');
+  paramDiv.innerHTML = '';
 
-    const variable = indicators.find(i => i.name === variableName);
-    if (!variable || !variable.parameters) return;
+  if (!variableName) return;
 
-    variable.parameters.forEach(param => {
-      if (param.name.toLowerCase() === 'symbol') {
-        const symbolSelectId = `cond_symbol_${Date.now()}`;
-        const select = document.createElement('select');
-        select.name = `cond_param_${variableName}_${param.name}`;
-        select.id = symbolSelectId;
-        select.className = 'symbol-dropdown input is-small mt-1';
-        paramDiv.appendChild(select);
-        initSelect2(`#${symbolSelectId}`, "Select symbol");
-      } else {
-        const input = document.createElement('input');
-        input.className = 'input is-small mt-1';
-        input.placeholder = param.name;
-        input.name = `cond_param_${variableName}_${param.name}`;
-        paramDiv.appendChild(input);
-      }
-    });
+  // Search in both indicators and userDefinedVariables
+  const variable =
+    indicators.find(i => i.name === variableName) ||
+    userDefinedVariables.find(v => v.name === variableName);
+
+  if (!variable) {
+    const warning = document.createElement('div');
+    warning.className = 'has-text-danger has-text-weight-semibold';
+    warning.textContent = "⚠️ Unknown variable selected.";
+    paramDiv.appendChild(warning);
+    return;
   }
+
+  if (!variable.parameters || variable.parameters.length === 0) {
+    const msg = document.createElement('div');
+    msg.className = 'has-text-grey-light is-size-7 is-italic mt-1';
+    msg.textContent = 'No parameters required.';
+    paramDiv.appendChild(msg);
+    return;
+  }
+
+  // Render required inputs
+  variable.parameters.forEach(param => {
+    if (param.name.toLowerCase() === 'symbol') {
+      const selectId = `cond_symbol_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const select = document.createElement('select');
+      select.name = `cond_param_${variableName}_${param.name}`;
+      select.id = selectId;
+      select.className = 'symbol-dropdown input is-small mt-1';
+      paramDiv.appendChild(select);
+      initSelect2(`#${selectId}`, "Select symbol");
+    } else {
+      const input = document.createElement('input');
+      input.className = 'input is-small mt-1';
+      input.placeholder = param.name;
+      input.name = `cond_param_${variableName}_${param.name}`;
+      input.value = param.default_value || "";
+      paramDiv.appendChild(input);
+    }
+  });
+}
+
 
   function renderInlineVariableParams(selectEl, index) {
     const variableName = selectEl.value;
@@ -256,6 +329,8 @@ function renderConditionVariableParams(selectEl) {
       }
     });
   }
+
+
 
 function validateExpressionBuilder(index) {
   const target = document.getElementById(`expression_builder_${index}`);
@@ -341,80 +416,443 @@ function validateExpressionBuilder(index) {
 
 function addUserDefinedVariable() {
   const container = document.getElementById('userConstantsContainer');
-  const list = document.getElementById('userConstantsList');
   const index = container.children.length;
 
   const box = document.createElement('div');
   box.classList.add('box', 'mb-3');
   box.id = `user_constant_box_${index}`;
   box.innerHTML = `
-  <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-    <strong>Constant Definition</strong>
-    <div class="is-flex is-align-items-center">
-      <span id="constant_status_${index}" class="icon is-small mr-2"></span>
-      <button type="button" class="delete" onclick="removeUserConstant(${index})"></button>
+    <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
+      <strong>Variable Definition</strong>
+      <div class="is-flex is-align-items-center">
+        <span id="constant_status_${index}" class="icon is-small mr-2"></span>
+        <button id="user_variable_close_${index}" type="button" class="delete" onclick="removeUserConstant(${index})"></button>
+      </div>
     </div>
-  </div>
 
-  <div class="field">
-    <label class="label">Constant Name</label>
-    <input class="input" name="user_constant_name_${index}" placeholder="e.g., Constant1">
-  </div>
+    <div class="field">
+      <label class="label">Variable Name</label>
+      <input class="input" name="user_constant_name_${index}" placeholder="e.g., Variable1" data-original-name="">
+      <p id="var_name_error_${index}" class="help is-danger" style="display:none;"></p>
+    </div>
 
-  <div id="expression_builder_${index}" class="is-flex is-align-items-center is-flex-wrap-wrap mb-3"></div>
-<span id="constant_status_${index}" class="icon is-small mr-2"></span>
-<p id="const_preview_${index}" class="is-size-7 has-text-grey mt-1 ml-1"></p>
+    <div id="expression_builder_${index}" class="is-flex is-align-items-center is-flex-wrap-wrap mb-3"></div>
+    <p id="const_preview_${index}" class="is-size-7 has-text-grey mt-1 ml-1"></p>
 
-  <div class="buttons mb-2">
-    <button type="button" class="button is-small is-primary" onclick="addExpressionVariable(${index})">➕ Variable</button>
-    <button type="button" class="button is-small is-info" onclick="addExpressionOperator(${index})">➕ Operator</button>
-    <button type="button" class="button is-small is-link" onclick="addExpressionValue(${index})">➕ Value</button>
-  </div>
+    <div class="buttons mb-2">
+      <button type="button" class="button is-small is-primary" onclick="addExpressionVariable(${index})">➕ Variable</button>
+      <button type="button" class="button is-small is-info" onclick="addExpressionOperator(${index})">➕ Operator</button>
+      <button type="button" class="button is-small is-link" onclick="addExpressionValue(${index})">➕ Value</button>
+    </div>
 
-  <button type="button" class="button is-small is-success" onclick="saveUserConstant(${index})">💾 Save Constant</button>
-`;
+    <button type="button" class="button is-small is-success" onclick="saveUserConstant(${index})">💾 Save Variable</button>
+  `;
 
   container.appendChild(box);
+box.querySelector(`input[name="user_constant_name_${index}"]`).dataset.originalName = "";
 
-  const listItem = document.createElement('div');
-  listItem.classList.add('mb-2');
-  listItem.id = `user_constant_list_item_${index}`;
-  listItem.innerHTML = `
-    <span><strong>Constant${index + 1}</strong></span>
-    <button type="button" class="button is-small is-danger ml-2" onclick="removeUserConstant(${index})">Delete</button>
+  // Add real-time validation on name input
+  const nameInput = box.querySelector(`input[name="user_constant_name_${index}"]`);
+  const errorText = box.querySelector(`#var_name_error_${index}`);
+
+  nameInput.addEventListener("input", function () {
+  const name = nameInput.value.trim();
+  const allInputs = document.querySelectorAll('input[name^="user_constant_name_"]');
+  let duplicate = false;
+
+  for (const inp of allInputs) {
+    if (inp !== nameInput && inp.value.trim() === name) {
+      duplicate = true;
+      break;
+    }
+  }
+
+  const existsInPredefined = userDefinedVariables.some(v => v.name === name);
+  const errorText = document.getElementById(`var_name_error_${index}`);
+  const saveBtn = document.querySelector(`#user_constant_box_${index} button[onclick^="saveUserConstant"]`);
+
+  if (!name) {
+    nameInput.classList.add("is-danger");
+    errorText.textContent = "Variable name cannot be empty.";
+    errorText.style.display = "block";
+    if (saveBtn) saveBtn.disabled = true;
+  } else if (duplicate || existsInPredefined) {
+    nameInput.classList.add("is-danger");
+    errorText.textContent = "Variable name already exists.";
+    errorText.style.display = "block";
+    if (saveBtn) saveBtn.disabled = true;
+  } else {
+    nameInput.classList.remove("is-danger");
+    errorText.style.display = "none";
+    errorText.textContent = "";
+    if (saveBtn) saveBtn.disabled = false;
+  }
+});
+
+}
+
+function saveUserConstant(index) {
+  const box = document.getElementById(`user_constant_box_${index}`);
+  const container = document.getElementById(`expression_builder_${index}`);
+  const nameInput = box.querySelector(`input[name="user_constant_name_${index}"]`);
+  const name = nameInput?.value?.trim();
+  const closeBtn = document.getElementById(`user_variable_close_${index}`);
+  const originalName = nameInput.getAttribute('data-original') || name;
+
+  if (closeBtn) closeBtn.style.display = 'none';
+
+  // Validate name
+  const allInputs = document.querySelectorAll('input[name^="user_constant_name_"]');
+  let duplicate = false;
+  allInputs.forEach(inp => {
+    if (inp !== nameInput && inp.value.trim() === name) duplicate = true;
+  });
+
+  const existsInPredefined = userDefinedVariables.some(v => v.name === name && name !== originalName);
+
+  const errorText = document.getElementById(`var_name_error_${index}`);
+  if (!name || (duplicate || existsInPredefined)) {
+    nameInput.classList.add("is-danger");
+    nameInput.title = !name ? "Variable name cannot be empty" : "Variable name already exists";
+    if (errorText) {
+      errorText.textContent = name ? "Variable name already exists" : "Variable name cannot be empty";
+    }
+    return;
+  }
+
+  nameInput.classList.remove("is-danger");
+  nameInput.removeAttribute("title");
+  if (errorText) errorText.textContent = "";
+
+  // Expression builder logic
+  const items = container.querySelectorAll('.expression-item');
+  const expression = [];
+  let formulaPreview = "";
+
+  items.forEach(item => {
+    const isVariable = item.querySelector('.inline-variable-dropdown');
+    const isOperator = item.querySelector('select') && !isVariable;
+    const isValue = item.querySelector('input') && !isVariable;
+
+    if (isVariable) {
+      const varName = isVariable.value;
+      const params = [];
+      const paramEls = item.querySelectorAll('.parameters input, .parameters select');
+      paramEls.forEach(p => {
+        const key = p.name.split('_').pop();
+        if (p.value) params.push({ key, value: p.value });
+      });
+      expression.push({ type: 'variable', name: varName, parameters: params });
+      formulaPreview += `${varName}(${params.map(p => `${p.key}=${p.value}`).join(', ')}) `;
+    } else if (isOperator) {
+      const value = item.querySelector('select').value;
+      expression.push({ type: 'operator', value });
+      formulaPreview += ` ${value} `;
+    } else if (isValue) {
+      const value = item.querySelector('input').value;
+      expression.push({ type: 'value', value });
+      formulaPreview += `${value} `;
+    }
+  });
+
+  // Update hidden input
+  let hiddenInput = document.getElementById(`user_constant_input_${index}`);
+  if (!hiddenInput) {
+    hiddenInput = document.createElement("input");
+    hiddenInput.type = "hidden";
+    hiddenInput.name = `user_variable_json_${index}`;
+    hiddenInput.id = `user_constant_input_${index}`;
+    document.getElementById("algoForm").appendChild(hiddenInput);
+  }
+  hiddenInput.value = JSON.stringify({ name, expression });
+
+  // UI updates
+  const preview = document.getElementById(`const_preview_${index}`);
+  if (preview) preview.style.display = 'none';
+
+  const fieldBlocks = box.querySelectorAll('.field, .buttons, .expression_builder');
+  fieldBlocks.forEach(el => el.style.display = 'none');
+
+  const oldBtn = box.querySelector("button[onclick^='saveUserConstant']");
+  if (oldBtn) oldBtn.remove();
+
+  const summaryLine = document.createElement('div');
+  summaryLine.id = `user_constant_summary_${index}`;
+  summaryLine.className = 'mt-2 p-2 has-background-light has-text-weight-semibold';
+  summaryLine.innerHTML = `<span class="has-text-grey-dark">${name} = ${formulaPreview.trim()}</span>`;
+  box.appendChild(summaryLine);
+
+  const actionWrapper = document.createElement("div");
+  actionWrapper.className = "buttons mt-2";
+  actionWrapper.id = `edit_delete_controls_${index}`;
+  actionWrapper.innerHTML = `
+    <button type="button" class="button is-small is-warning" onclick="editUserConstant(${index})">✏️</button>
+    <button type="button" class="button is-small is-danger" onclick="removeUserConstant(${index})">🗑️</button>
   `;
-  list.appendChild(listItem);
+  box.appendChild(actionWrapper);
+
+  // Update global registry
+  userDefinedVariables = userDefinedVariables.filter(v => v.name !== originalName);
+  userDefinedVariables.push({ name, expression });
+
+  // Update dropdowns
+ // 🆕 Update all dropdowns with the latest user-defined variable list
+const allDropdowns = document.querySelectorAll('.inline-variable-dropdown');
+allDropdowns.forEach(dd => {
+  const currentVal = dd.value; // preserve selected value
+  dd.innerHTML = getAllVariableOptionsHTML();
+  $(dd).val(currentVal).trigger('change.select2');  // update Select2
+});
+
+  // Persist to backend
+ 
+
+  // Track saved name
+  nameInput.setAttribute("data-original", name);
+}
+
+function editUserConstant(index) {
+  const box = document.getElementById(`user_constant_box_${index}`);
+  const summary = document.getElementById(`user_constant_summary_${index}`);
+  const controls = document.getElementById(`edit_delete_controls_${index}`);
+  const preview = document.getElementById(`const_preview_${index}`);
+  const closeBtn = document.getElementById(`user_variable_close_${index}`);
+
+  if (summary) summary.remove();
+  if (controls) controls.remove();
+  if (preview) preview.style.display = 'none';
+  if (closeBtn) closeBtn.style.display = 'inline-block';
+
+  const allFields = box.querySelectorAll('.field, .expression_builder, .buttons');
+  allFields.forEach(el => el.style.display = '');
+
+  const oldBtn = box.querySelector("button[onclick^='saveUserConstant']");
+  if (oldBtn) oldBtn.remove();
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'button is-small is-success';
+  saveBtn.textContent = '💾 Save Variable';
+  saveBtn.setAttribute('onclick', `saveUserConstant(${index})`);
+  box.appendChild(saveBtn);
+
+  const nameInput = box.querySelector(`input[name="user_constant_name_${index}"]`);
+  const originalName = nameInput.value.trim();
+  nameInput.setAttribute('data-original', originalName);
+
+  // Error box
+  let errorText = document.getElementById(`var_name_error_${index}`);
+  if (!errorText) {
+    errorText = document.createElement("p");
+    errorText.id = `var_name_error_${index}`;
+    errorText.className = "help is-danger";
+    nameInput.parentElement.appendChild(errorText);
+  }
+
+  // Revalidation
+  nameInput.addEventListener("input", function () {
+    const name = nameInput.value.trim();
+    const allInputs = document.querySelectorAll('input[name^="user_constant_name_"]');
+    let duplicate = false;
+    for (const inp of allInputs) {
+      if (inp !== nameInput && inp.value.trim() === name) {
+        duplicate = true;
+        break;
+      }
+    }
+
+    const existsInPredefined = userDefinedVariables.some(v => v.name === name && name !== originalName);
+    const isSameAsOriginal = name === originalName;
+
+    if (!name) {
+      nameInput.classList.add("is-danger");
+      nameInput.title = "Variable name cannot be empty";
+      errorText.textContent = "Variable name cannot be empty";
+      saveBtn.disabled = true;
+    } else if ((duplicate || existsInPredefined) && !isSameAsOriginal) {
+      nameInput.classList.add("is-danger");
+      nameInput.title = "Variable name already exists";
+      errorText.textContent = "Variable name already exists";
+      saveBtn.disabled = true;
+    } else {
+      nameInput.classList.remove("is-danger");
+      nameInput.removeAttribute("title");
+      errorText.textContent = "";
+      saveBtn.disabled = false;
+    }
+  });
+
+  nameInput.dispatchEvent(new Event("input"));  // Trigger validation immediately
+}
+
+function highlightConditionRowsUsing(varName) {
+  document.querySelectorAll('.condition-variable').forEach(select => {
+    const row = select.closest('.condition-row');
+    if (select.value === varName && row) {
+      row.classList.add('highlight-red');
+    }
+  });
+}
+
+function highlightUserVarsUsing(varName) {
+  document.querySelectorAll('.expression-item').forEach(item => {
+    const dropdown = item.querySelector('.inline-variable-dropdown');
+    if (dropdown?.value === varName) {
+      const row = item.closest('.expression_builder')?.closest('.box');
+      if (row) row.classList.add('highlight-red');
+    }
+  });
+}
+function showModal(msg) {
+  document.querySelector("#varInUseModal .modal-card-body").innerHTML = `
+    <p class="has-text-danger">❌ ${msg}</p>
+  `;
+  document.getElementById("varInUseModal").classList.add("is-active");
 }
 
 function removeUserConstant(index) {
   const box = document.getElementById(`user_constant_box_${index}`);
-  const item = document.getElementById(`user_constant_list_item_${index}`);
-  if (box) box.remove();
-  if (item) item.remove();
+  const nameInput = box.querySelector(`input[name="user_constant_name_${index}"]`);
+  const name = nameInput?.value?.trim();
+  if (!name) return;
+
+  let usedInOtherUserVars = false;
+  let usedAsLHS = false;
+  let usedAsRHS = false;
+
+  // 🔍 1. Check if variable is used in other user-defined variables
+  for (let v of userDefinedVariables) {
+    if (v.name !== name) {
+      const exprString = JSON.stringify(v.expression);
+      if (exprString.includes(`"${name}"`)) {
+        usedInOtherUserVars = true;
+        break;
+      }
+    }
+  }
+
+  // 🔍 2. Check if variable is used in LHS of condition rows
+  const lhsSelects = document.querySelectorAll(".condition-variable");
+  usedAsLHS = Array.from(lhsSelects).some(select => select.value === name);
+
+  // 🔍 3. Check if variable is used in RHS of condition rows
+  const rhsSelects = document.querySelectorAll(".rhs-variable-dropdown");
+  usedAsRHS = Array.from(rhsSelects).some(select => select.value === name);
+
+  // 🚫 If used anywhere, prevent deletion
+  if (usedInOtherUserVars || usedAsLHS || usedAsRHS) {
+    let msg = `⚠️ Cannot delete "${name}" because it is used `;
+    if (usedInOtherUserVars) msg += `in another user-defined variable.`;
+    else if (usedAsLHS) msg += `as a variable in a condition row (LHS).`;
+    else if (usedAsRHS) msg += `as a variable in a condition row (RHS).`;
+    alert(msg);
+    return;
+  }
+
+  // ✅ 1. Remove from DOM
+  box?.remove();
+
+  // ✅ 2. Remove from global registry
+  userDefinedVariables = userDefinedVariables.filter(v => v.name !== name);
+
+  // ✅ 3. Remove from all condition dropdowns
+  const dropdowns = document.querySelectorAll(".condition-variable, .rhs-variable-dropdown");
+  dropdowns.forEach(dd => {
+    const options = dd.querySelectorAll("option");
+    options.forEach(opt => {
+      if (opt.value === name) opt.remove();
+    });
+  });
+
+  // ✅ 4. Remove from sessionStorage
+  const saved = sessionStorage.getItem("userDefinedVariables");
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved).filter(v => v.name !== name);
+      sessionStorage.setItem("userDefinedVariables", JSON.stringify(parsed));
+    } catch (err) {
+      console.warn("⚠️ Session storage cleanup failed:", err);
+    }
+  }
+
+  // ✅ 5. Inform backend (optional)
+  fetch('/api/user_variable/delete/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify({ name })
+  }).then(res => {
+    if (!res.ok) {
+      console.error(`❌ Failed to delete ${name} from DB`);
+    }
+  }).catch(err => {
+    console.error('❌ AJAX Delete Error:', err);
+  });
 }
+
 
 function addExpressionVariable(index) {
   const target = document.getElementById(`expression_builder_${index}`);
   const wrapper = document.createElement('div');
   wrapper.classList.add('expression-item');
 
+  // Group and sort indicators by category
+  const grouped = {};
+  indicators.forEach(v => {
+    const cat = v.category || "uncategorized";
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(v);
+  });
+
+  const categoryNames = Object.keys(grouped).sort(); // sort category list alphabetically
+
+  let dropdownHtml =  buildVariableDropdown();  
+
+  categoryNames.forEach(cat => {
+    const sortedVars = grouped[cat].sort((a, b) => a.display_name.localeCompare(b.display_name));
+    dropdownHtml += `<optgroup label="${cat.charAt(0).toUpperCase() + cat.slice(1)}">`;
+    sortedVars.forEach(v => {
+      dropdownHtml += `<option value="${v.name}">${v.display_name}</option>`;
+    });
+    dropdownHtml += `</optgroup>`;
+  });
+
+  // ✅ Include all previously saved user-defined variables
+  if (userDefinedVariables.length > 0) {
+    const sortedUserVars = [...userDefinedVariables].sort((a, b) => a.name.localeCompare(b.name));
+    dropdownHtml += `<optgroup label="User Defined">`;
+    sortedUserVars.forEach(v => {
+      dropdownHtml += `<option value="${v.name}">${v.name}</option>`;
+    });
+    dropdownHtml += `</optgroup>`;
+  }
+
   wrapper.innerHTML = `
     <div class="field box p-2 has-background-light">
-      <button class="delete is-small is-pulled-right" onclick="this.closest('.expression-item').remove(); validateExpressionBuilder(${index})"></button>
-      <select class="inline-variable-dropdown" onchange="renderInlineVariableParams(this, ${index}); validateExpressionBuilder(${index})" style="width: 200px;">
-        <option value="">-- Variable --</option>
-        ${indicators.map(i => `<option value="${i.name}">${i.display_name}</option>`).join('')}
+      <button class="delete is-small is-pulled-right"
+        onclick="this.closest('.expression-item').remove(); validateExpressionBuilder(${index})">
+      </button>
+      <select class="inline-variable-dropdown"
+        onchange="renderInlineVariableParams(this, ${index}); validateExpressionBuilder(${index})"
+        style="width: 200px;">
+        ${dropdownHtml}
       </select>
       <div class="parameters mt-1"></div>
     </div>`;
+
   target.appendChild(wrapper);
   validateExpressionBuilder(index);
 
+  // ✅ Initialize Select2 with category formatting
   setTimeout(() => {
-    $(wrapper).find('.inline-variable-dropdown').select2({
+    const $dropdown = $(wrapper).find('.inline-variable-dropdown');
+    $dropdown.select2({
       width: '200px',
       placeholder: "Search variable",
-      allowClear: true
+      allowClear: true,
+      templateResult: formatDropdownItem
     });
   }, 0);
 }
@@ -456,81 +894,49 @@ function addExpressionValue(index) {
 }
 
 
-function saveUserConstant(index) {
-  const container = document.getElementById(`expression_builder_${index}`);
-  const nameInput = document.querySelector(`input[name="user_constant_name_${index}"]`);
-  const name = nameInput?.value?.trim();
+function preloadUserDefinedVariables() {
+  if (!Array.isArray(userDefinedVariables)) return;
 
-  if (!name) {
-    alert("Please enter a name for the constant.");
-    nameInput.focus();
-    return;
-  }
+  userDefinedVariables.forEach((v, idx) => {
+    const container = document.getElementById('userConstantsContainer');
 
-  // Re-validate before saving
-  validateExpressionBuilder(index);
+    const box = document.createElement('div');
+    box.classList.add('box', 'mb-3');
+    box.id = `user_constant_box_preloaded_${idx}`;
 
-  const errorBox = document.getElementById(`expr_error_box_${index}`);
-  if (errorBox && errorBox.style.display !== 'none') {
-    alert("Please fix validation errors before saving.");
-    return;
-  }
+    const formulaText = v.expression.map(el => {
+      if (el.type === 'variable') {
+        const params = el.parameters.map(p => `${p.key}=${p.value}`).join(", ");
+        return `${el.name}(${params})`;
+      } else if (el.type === 'operator') {
+        return ` ${el.value} `;
+      } else if (el.type === 'value') {
+        return `${el.value}`;
+      }
+    }).join(" ");
 
-  // Build JSON expression
-  const items = container.querySelectorAll('.constant-item');
-  const expression = [];
-  let formulaPreview = "";
+    box.innerHTML = `
+      <div class="mt-2 p-2 has-background-light has-text-weight-semibold">
+        <span class="has-text-grey-dark">${v.name} = ${formulaText.trim()}</span>
+      </div>
+    `;
 
-  items.forEach(item => {
-    const type = item.getAttribute('data-type');
-    const value = item.getAttribute('data-value');
-    expression.push({ type, value });
+    container.appendChild(box);
 
-    if (type === 'operator') {
-      formulaPreview += ` ${value} `;
-    } else {
-      formulaPreview += `${value}`;
-    }
+    // Also inject into dropdowns
+    const dropdowns = document.querySelectorAll('.condition-variable');
+    dropdowns.forEach(dd => {
+      if (![...dd.options].some(o => o.value === v.name)) {
+        const opt = document.createElement("option");
+        opt.value = v.name;
+        opt.textContent = `${v.name}`;
+        dd.appendChild(opt);
+      }
+    });
   });
-
-  // Save to local JS memory
-  userConstants[index] = { name, expression };
-
-  // Inject hidden input for form submission
-  let hiddenInput = document.getElementById(`user_constant_input_${index}`);
-  if (!hiddenInput) {
-    hiddenInput = document.createElement('input');
-    hiddenInput.type = 'hidden';
-    hiddenInput.name = `user_constant_json_${index}`;
-    hiddenInput.id = `user_constant_input_${index}`;
-    document.getElementById("algoForm").appendChild(hiddenInput);
-  }
-  hiddenInput.value = JSON.stringify({ name, expression });
-
-  // Update preview visually
-  let previewDiv = document.getElementById(`const_preview_${index}`);
-  if (!previewDiv) {
-    previewDiv = document.createElement('div');
-    previewDiv.id = `const_preview_${index}`;
-    previewDiv.className = 'has-text-grey mt-2 is-size-7';
-    container.parentElement.appendChild(previewDiv);
-  }
-  previewDiv.textContent = `Formula: ${formulaPreview}`;
-
-  // Show confirmation message below constant block
-let tempMsg = document.getElementById(`user_constant_saved_msg_${index}`);
-if (!tempMsg) {
-  tempMsg = document.createElement('div');
-  tempMsg.id = `user_constant_saved_msg_${index}`;
-  tempMsg.className = 'has-text-success is-size-7 mt-1';
-  container.parentElement.appendChild(tempMsg);
 }
-tempMsg.innerHTML = `<span class="icon-text">
-  <span class="icon">✅</span>
-  <span>Constant "<strong>${name}</strong>" saved temporarily. Final save when algorithm is submitted.</span>
-</span>`;
 
-}
+document.addEventListener("DOMContentLoaded", preloadUserDefinedVariables);
 
 
 function addLeg() {
@@ -688,7 +1094,6 @@ function addConditionRow(target) {
             <option value="AND">AND</option>
             <option value="OR">OR</option>
           </select>
-          
         </div>
       </div>
       <div class="conditions" id="${groupId}"></div>
@@ -700,29 +1105,106 @@ function addConditionRow(target) {
 
   const row = document.createElement("div");
   row.classList.add("is-flex", "is-align-items-center", "mb-2", "condition-row");
-  row.innerHTML = `
-    <div class="select mr-2">
-      <select class="condition-variable" onchange="renderConditionVariableParams(this)">
-        <option value="">-- Variable --</option>
-        ${indicators.map(i => `<option value="${i.name}">${i.display_name}</option>`).join('')}
-      </select>
-    </div>
-    <div class="condition-parameters mr-2"></div>
-    <div class="select mr-2">
-      <select class="condition-operator">
-        <option value=">">&gt;</option>
-        <option value="<">&lt;</option>
-        <option value=">=">&gt;=</option>
-        <option value="<=">&lt;=</option>
-        <option value="==">==</option>
-        <option value="!=">!=</option>
-      </select>
-    </div>
-    <input class="input mr-2 condition-value" type="text" placeholder="Value" style="width: 150px;">
-    <button type="button" class="delete" onclick="this.parentElement.remove()"></button>
-    <button type="button" class="button is-small is-warning ml-2" onclick="addSubGroupToCondition(this)">➕ Subgroup</button>
+
+  // Variable Dropdown (LHS)
+  const lhsSelectWrapper = document.createElement("div");
+  lhsSelectWrapper.className = "select mr-2";
+  const lhsSelect = document.createElement("select");
+  lhsSelect.className = "condition-variable inline-variable-dropdown";
+  lhsSelect.innerHTML = getAllVariableOptionsHTML();
+  lhsSelect.onchange = function () {
+    renderConditionVariableParams(this);
+  };
+  lhsSelectWrapper.appendChild(lhsSelect);
+
+  // Parameters (LHS)
+  const paramWrapper = document.createElement("div");
+  paramWrapper.className = "condition-parameters mr-2";
+
+  // Operator Dropdown
+  const operatorSelectWrapper = document.createElement("div");
+  operatorSelectWrapper.className = "select mr-2";
+  const operatorSelect = document.createElement("select");
+  operatorSelect.className = "condition-operator";
+  operatorSelect.innerHTML = `
+    <option value=">">&gt;</option>
+    <option value="<">&lt;</option>
+    <option value=">=">&gt;=</option>
+    <option value="<=">&lt;=</option>
+    <option value="==">==</option>
+    <option value="!=">!=</option>
   `;
+  operatorSelectWrapper.appendChild(operatorSelect);
+
+  // RHS Mode Toggle
+  const rhsModeWrapper = document.createElement("div");
+  rhsModeWrapper.className = "select mr-2";
+  const rhsModeSelect = document.createElement("select");
+  rhsModeSelect.className = "rhs-mode";
+  rhsModeSelect.innerHTML = `
+    <option value="value">Value</option>
+    <option value="variable">Variable</option>
+  `;
+  rhsModeWrapper.appendChild(rhsModeSelect);
+
+  // RHS Input (Value)
+  const rhsValueInput = document.createElement("input");
+  rhsValueInput.type = "text";
+  rhsValueInput.placeholder = "Value";
+  rhsValueInput.className = "input mr-2 rhs-input condition-value";
+  rhsValueInput.style.width = "150px";
+
+  // RHS Input (Variable dropdown)
+  const rhsVarSelectWrapper = document.createElement("div");
+  rhsVarSelectWrapper.className = "select mr-2 rhs-input";
+  rhsVarSelectWrapper.style.display = "none";
+  const rhsVarSelect = document.createElement("select");
+  rhsVarSelect.className = "rhs-variable-dropdown";
+  rhsVarSelect.innerHTML = getAllVariableOptionsHTML();
+  rhsVarSelectWrapper.appendChild(rhsVarSelect);
+
+  rhsModeSelect.onchange = function () {
+    if (rhsModeSelect.value === "value") {
+      rhsValueInput.style.display = "inline-block";
+      rhsVarSelectWrapper.style.display = "none";
+    } else {
+      rhsValueInput.style.display = "none";
+      rhsVarSelectWrapper.style.display = "inline-block";
+    }
+  };
+
+  // Delete Condition Button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete";
+  deleteBtn.type = "button";
+  deleteBtn.onclick = function () {
+    row.remove();
+  };
+
+  // Subgroup Button
+  const subgroupBtn = document.createElement("button");
+  subgroupBtn.className = "button is-small is-warning ml-2";
+  subgroupBtn.type = "button";
+  subgroupBtn.textContent = "➕ Subgroup";
+  subgroupBtn.onclick = function () {
+    addSubGroupToCondition(this);
+  };
+
+  // Assemble condition row
+  row.appendChild(lhsSelectWrapper);
+  row.appendChild(paramWrapper);
+  row.appendChild(operatorSelectWrapper);
+  row.appendChild(rhsModeWrapper);
+  row.appendChild(rhsValueInput);
+  row.appendChild(rhsVarSelectWrapper);
+  row.appendChild(deleteBtn);
+  row.appendChild(subgroupBtn);
+
   container.appendChild(row);
+
+  // Initialize Select2
+  $(lhsSelect).select2({ width: 'auto', placeholder: 'Select Variable' });
+  $(rhsVarSelect).select2({ width: 'auto', placeholder: 'Select Variable' });
 }
 
 function addSubGroupToCondition(button) {
@@ -940,6 +1422,204 @@ $(function () {
     });
   });
 });
+
+
+document.addEventListener('DOMContentLoaded', function () {
+  const algoInput = document.querySelector('input[name="AlgoName"]');
+  const saveBtn = document.querySelector('form#algoForm button[type="submit"]');
+  const feedback = document.createElement('p');
+  feedback.className = "help is-danger";
+  algoInput.parentElement.appendChild(feedback);
+
+  algoInput.addEventListener('input', function () {
+    const name = algoInput.value.trim();
+
+    if (!name) {
+      feedback.textContent = "Algorithm name cannot be empty.";
+      algoInput.classList.add("is-danger");
+      saveBtn.disabled = true;
+      return;
+    }
+
+    fetch(`/check_algo_name/?name=${encodeURIComponent(name)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          feedback.textContent = "";
+          algoInput.classList.remove("is-danger");
+          saveBtn.disabled = false;
+        } else {
+          feedback.textContent = data.message;
+          algoInput.classList.add("is-danger");
+          saveBtn.disabled = true;
+        }
+      })
+      .catch(() => {
+        feedback.textContent = "Error checking name.";
+        algoInput.classList.add("is-danger");
+        saveBtn.disabled = true;
+      });
+  });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  const algoNameInput = document.getElementById("AlgoName");
+  const fundInput = document.getElementById("MinimumFund");
+  const defineBtn = document.getElementById("defineStrategyBtn");
+
+  const feedback = document.getElementById("algoNameError");
+  const fundFeedback = document.getElementById("fundError");
+
+  function validateFields() {
+    const name = algoNameInput.value.trim();
+    const fund = fundInput.value.trim();
+
+    fundFeedback.style.display = fund ? "none" : "block";
+    defineBtn.disabled = !name || !fund;
+
+    if (!name) {
+      feedback.textContent = "Algorithm name is required.";
+      feedback.style.display = "block";
+      algoNameInput.classList.add("is-danger");
+      return;
+    }
+
+    // Check uniqueness via AJAX
+    fetch(`/check_algo_name/?name=${encodeURIComponent(name)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          feedback.textContent = "";
+          feedback.style.display = "none";
+          algoNameInput.classList.remove("is-danger");
+          defineBtn.disabled = !fund;
+        } else {
+          feedback.textContent = data.message;
+          feedback.style.display = "block";
+          algoNameInput.classList.add("is-danger");
+          defineBtn.disabled = true;
+        }
+      })
+      .catch(() => {
+        feedback.textContent = "Error checking algorithm name.";
+        feedback.style.display = "block";
+        defineBtn.disabled = true;
+        algoNameInput.classList.add("is-danger");
+      });
+  }
+
+  algoNameInput.addEventListener("input", validateFields);
+  fundInput.addEventListener("input", validateFields);
+});
+
+function showStrategySection() {
+  const name = document.getElementById("AlgoName").value.trim();
+  const fund = document.getElementById("MinimumFund").value.trim();
+
+  if (name && fund) {
+    document.getElementById("strategySection").style.display = "block";
+    document.getElementById("defineStrategyBtn").disabled = true;
+   // document.getElementById("basicDetailsSection").querySelectorAll("input, textarea").forEach(el => el.disabled = true);
+  } else {
+    document.getElementById("algoNameError").style.display = name ? "none" : "block";
+    document.getElementById("fundError").style.display = fund ? "none" : "block";
+  }
+}
+function formatDropdownItem(data) {
+  if (!data.id) return data.text;
+
+  const isUserVar = data.text.includes("(User Var)");
+  const parent = data.element?.parentElement?.label || "";
+
+  // Format optgroup label items
+  if (!data.element || !data.element.value) return data.text;
+
+  const style = parent === "User Defined"
+    ? 'color: #1b5e20; font-weight: 600;'
+    : 'color: #004085; font-weight: 600;';
+
+  const text = isUserVar ? `<span style="margin-left: 6px;">${data.text}</span>` : data.text;
+
+  return $(`<span style="${style} font-size: 13px;">${text}</span>`);
+}
+
+function getAllVariableOptionsHTML() {
+  const grouped = {};
+  indicators.forEach(v => {
+    const cat = v.category || "uncategorized";
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(v);
+  });
+
+  const categoryNames = Object.keys(grouped).sort();
+  let html = `<option value="">-- Select Variable --</option>`;
+
+  categoryNames.forEach(cat => {
+    const sorted = grouped[cat].sort((a, b) => a.display_name.localeCompare(b.display_name));
+    html += `<optgroup label="${cat}">`;
+    sorted.forEach(v => {
+      html += `<option value="${v.name}">${v.display_name}</option>`;
+    });
+    html += `</optgroup>`;
+  });
+
+  const sortedUserVars = [...userDefinedVariables].sort((a, b) => a.name.localeCompare(b.name));
+  if (sortedUserVars.length > 0) {
+    html += `<optgroup label="User Defined">`;
+    sortedUserVars.forEach(v => {
+      html += `<option value="${v.name}">${v.name}</option>`;
+    });
+    html += `</optgroup>`;
+  }
+
+  return html;
+}
+
+function buildVariableDropdown(index) {
+  // Group indicators by category
+  const grouped = {};
+  indicators.forEach(v => {
+    const cat = v.category || "uncategorized";
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(v);
+  });
+
+  const categoryNames = Object.keys(grouped).sort();
+  let dropdownHtml = `<option value="">-- Select Variable --</option>`;
+
+  categoryNames.forEach(cat => {
+    const sorted = grouped[cat].sort((a, b) => a.display_name.localeCompare(b.display_name));
+    dropdownHtml += `<optgroup label="${cat}">`;
+    sorted.forEach(v => {
+      dropdownHtml += `<option value="${v.name}">${v.display_name}</option>`;
+    });
+    dropdownHtml += `</optgroup>`;
+  });
+
+  // Show all user-defined vars (not index-limited anymore)
+  const sortedUserVars = [...userDefinedVariables].sort((a, b) => a.name.localeCompare(b.name));
+  if (sortedUserVars.length > 0) {
+    dropdownHtml += `<optgroup label="User Defined">`;
+    sortedUserVars.forEach(v => {
+      dropdownHtml += `<option value="${v.name}">${v.name} (User Var)</option>`;
+    });
+    dropdownHtml += `</optgroup>`;
+  }
+
+  return dropdownHtml;
+}
+function showVarInUseModal() {
+  document.getElementById("varInUseModal").classList.add("is-active");
+}
+
+function closeVarInUseModal() {
+  document.getElementById("varInUseModal").classList.remove("is-active");
+
+  // Optional: remove highlight after modal close
+  document.querySelectorAll('.condition-row.highlight-red').forEach(el => {
+    el.classList.remove('highlight-red');
+  });
+}
 
 </script>
 {% endblock %}

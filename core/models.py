@@ -90,15 +90,24 @@ class AlgoVariable(models.Model):
 class Condition(models.Model):
     algo_logic = models.ForeignKey(AlgorithmLogic, on_delete=models.CASCADE, related_name='conditions')
     condition_type = models.CharField(max_length=10, choices=[('entry', 'Entry'), ('exit', 'Exit')])
-    variable_name = models.CharField(max_length=100)
-    operator = models.CharField(max_length=10)
-    value = models.CharField(max_length=100)
+
+    lhs_variable = models.CharField(max_length=100)  # e.g., "supertrend"
+    lhs_parameters = models.JSONField(default=dict, blank=True)  # e.g., {"symbol": "NIFTY", "period": 10}
+
+    operator = models.CharField(max_length=10, choices=[
+        ('>', '>'), ('<', '<'), ('>=', '>='), ('<=', '<='), ('==', '=='), ('!=', '!=')
+    ])
+
+    rhs_type = models.CharField(max_length=10, choices=[('value', 'Value'), ('variable', 'Variable')])
+    rhs_value = models.CharField(max_length=100, blank=True, null=True)  # Used if rhs_type == value
+    rhs_variable = models.CharField(max_length=100, blank=True, null=True)  # Used if rhs_type == variable
+    rhs_parameters = models.JSONField(default=dict, blank=True)  # Used if rhs_type == variable
+
     connector = models.CharField(max_length=3, choices=[('AND', 'AND'), ('OR', 'OR')])
     nested_condition = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
 
     def __str__(self):
-        return f"{self.variable_name} {self.operator} {self.value} [{self.connector}]"
-
+        return f"{self.lhs_variable} {self.operator} {self.rhs_value or self.rhs_variable}"
 
 class InstrumentList(models.Model):
     token = models.CharField(max_length=50)
@@ -169,8 +178,14 @@ class TechnicalIndicator(models.Model):
         return self.display_name
 
 
-class UserDefinedConstant(models.Model):
-    algo = models.ForeignKey(AlgoList, on_delete=models.CASCADE, related_name='constants')
+class UserDefinedVariable(models.Model):
+    algo = models.ForeignKey(AlgoList, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # ✅ add this line
     name = models.CharField(max_length=100)
-    expression = models.JSONField()  # To store [{type: 'variable', value: 'RSI'}, ...]
+    expression = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('algo', 'user', 'name')  # ✅ enforce uniqueness per user per algo
+

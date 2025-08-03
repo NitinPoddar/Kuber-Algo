@@ -1,11 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 import json, urllib.request, os
 from django.utils import timezone
-from .models import UserDefinedConstant,AlgoList, AlgorithmLogic, Broker, AlgoRegister, AlgoStatus, InstrumentList, Condition,TechnicalIndicator,Variable, VariableParameter
+from .models import UserDefinedVariable ,AlgoList, AlgorithmLogic, Broker, AlgoRegister, AlgoStatus, InstrumentList, Condition,TechnicalIndicator,Variable, VariableParameter
 from .forms import CustomUserCreationForm, AlgorithmForm
 from django.core.serializers.json import DjangoJSONEncoder
 from core.utils.condition_utils import save_condition_structure
@@ -77,6 +79,57 @@ def get_instruments():
         json.dump(data, f, indent=4)
     return data
 
+
+@csrf_exempt
+@require_POST
+@login_required
+def save_user_variable(request):
+    try:
+        data = json.loads(request.body)
+        name = data.get("name")
+        expression = data.get("expression")
+        user = request.user
+
+        if not name or not isinstance(expression, list):
+            return JsonResponse({'error': 'Invalid data'}, status=400)
+
+        # Update if exists
+        obj, created = UserDefinedVariable.objects.update_or_create(
+            user=user,
+            name=name,
+            defaults={'expression': expression}
+        )
+        return JsonResponse({'status': 'ok', 'updated': not created})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_POST
+@login_required
+def delete_user_variable(request):
+    try:
+        data = json.loads(request.body)
+        name = data.get("name")
+        if name:
+            UserDefinedVariable.objects.filter(name=name, user=request.user).delete()
+            return JsonResponse({"status": "success"})
+        return JsonResponse({"status": "error", "message": "Name required"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@login_required
+def check_algo_name(request):
+    name = request.GET.get("name", "").strip()
+    if not name:
+        return JsonResponse({"valid": False, "message": "Name cannot be empty."})
+
+    exists = AlgoList.objects.filter(algo_name=name, created_by=request.user).exists()
+    if exists:
+        return JsonResponse({"valid": False, "message": "This algorithm name already exists."})
+    
+    return JsonResponse({"valid": True})
+
 @require_http_methods(["POST"])
 @staff_member_required  # 👈 restrict to staff/admin users only
 def insert_instruments(request):
@@ -135,23 +188,27 @@ def add_algo(request):
             created_at=timezone.now(),
             updated_at=timezone.now()
         )
+        # Save user-defined variables
         for key in request.POST:
-            if key.startswith("user_constant_json_"):
+            if key.startswith("user_variable_json_"):
                 try:
                     raw_json = request.POST[key]
-                    const_data = json.loads(raw_json)
-                    name = const_data.get("name")
-                    expression = const_data.get("expression")
+                    var_data = json.loads(raw_json)
+                    var_name = var_data.get("name")
+                    var_expr = var_data.get("expression")
 
-                    if name and isinstance(expression, list):
-                        UserDefinedConstant.objects.create(
-                            algo=algo,
-                            name=name,
-                            expression=expression
-                        )
+                    if var_name and isinstance(var_expr, list):
+                # Avoid duplicates
+                        if not UserDefinedVariable.objects.filter(algo=algo, user=request.user, name=var_name).exists():
+                            UserDefinedVariable.objects.create(
+                                algo=algo,
+                                user=request.user,
+                                name=var_name,
+                                expression=var_expr
+                                )
                 except json.JSONDecodeError as e:
-                    print(f"[UserConstant Error] {key}: {e}")
-        
+                    print(f"[UserVariable Error] {key}: {e}")
+
         instruments = request.POST.getlist("instrument_name[]")
         
         expiries = request.POST.getlist("expiry_date[]")
@@ -218,6 +275,7 @@ def add_algo(request):
         {
             'name': v.name,
             'display_name': v.display_name,
+            'category': v.category.name if v.category else 'uncategorized',  # ✅ ADD THIS LINE
             'parameters': [
                 {
                     'name': p.name,
@@ -231,23 +289,39 @@ def add_algo(request):
         } for v in variables
     ], cls=DjangoJSONEncoder)
     
+    #user_variables = UserDefinedVariable.objects.filter(user=request.user)
+    user_variables = []
+    user_vars_json = json.dumps([
+        {"name": v.name, "expression": v.expression} for v in user_variables
+    ], cls=DjangoJSONEncoder)
 
     return render(request, "algorelated/add_algo.html", {
         "instruments_json": instruments_json,
         "indicators_json": indicators_json,
-        "symbol_list_json":symbol_list_json
+        "symbol_list_json": symbol_list_json,
+        "user_vars_json": mark_safe(user_vars_json)  # 👉 make it available in your template
     })
 
+    
 def save_condition_structure(algo_logic, conditions, condition_type='entry', parent=None):
     for cond in conditions:
+        lhs = cond.get('lhs', {})
+        rhs = cond.get('rhs', {})
+
         current = Condition.objects.create(
             algo_logic=algo_logic,
             condition_type=condition_type,
-            variable_name=cond.get('variable_name'),
+            lhs_variable=lhs.get('name'),
+            lhs_parameters=lhs.get('parameters', {}),
             operator=cond.get('operator'),
-            value=str(cond.get('value')),
+            rhs_type=rhs.get('type'),
+            rhs_value=rhs.get('value') if rhs.get('type') == 'value' else None,
+            rhs_variable=rhs.get('name') if rhs.get('type') == 'variable' else None,
+            rhs_parameters=rhs.get('parameters', {}) if rhs.get('type') == 'variable' else {},
+            connector=cond.get('connector', 'AND'),
             nested_condition=parent
         )
+
         for child in cond.get('children', []):
             save_condition_structure(algo_logic, [child], condition_type, parent=current)
 

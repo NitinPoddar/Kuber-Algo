@@ -19,3 +19,40 @@ def serialize_conditions(root_conditions):
 
     return [recurse(c) for c in root_conditions]
 
+def build_condition_as_python(condition):
+    """
+    Build a single condition string like: rsi(period=14) > 30 or supertrend(symbol='NIFTY') <= ema(period=21)
+    """
+    def format_variable(name, parameters):
+        if not parameters:
+            return f"{name}()"
+        params_str = ", ".join(f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}" for k, v in parameters.items())
+        return f"{name}({params_str})"
+
+    lhs = format_variable(condition.lhs_variable, condition.lhs_parameters or {})
+    
+    if condition.rhs_type == 'value':
+        rhs = f"'{condition.rhs_value}'" if isinstance(condition.rhs_value, str) else str(condition.rhs_value)
+    elif condition.rhs_type == 'variable':
+        rhs = format_variable(condition.rhs_variable, condition.rhs_parameters or {})
+    else:
+        rhs = "UNKNOWN"
+
+    return f"{lhs} {condition.operator} {rhs}"
+
+
+def render_condition_as_python(conditions):
+    """
+    Recursively builds full Python string from nested conditions.
+    """
+    def recurse(condition):
+        base = build_condition_as_python(condition)
+        children = condition.children.all()
+        if children:
+            joined = f" {condition.connector} ".join([recurse(child) for child in children])
+            return f"({base} {condition.connector} {joined})"
+        else:
+            return base
+
+    return " AND ".join([recurse(c) for c in conditions])
+
