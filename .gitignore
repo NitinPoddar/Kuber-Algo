@@ -1,0 +1,35 @@
+# === Python/Django ===
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+*.mo
+
+# === Virtual Environments ===
+venv/
+env/
+ENV/
+.VENV/
+.venv/
+
+# === VSCode or IDE-specific ===
+.vscode/
+.idea/
+*.swp
+
+# === Django Media/Static Files ===
+media/
+staticfiles/
+
+# === Google Drive Backup ===
+credentials.json
+token.json
+*.zip
+
+# === System Files ===
+.DS_Store
+Thumbs.db
+
+# === Git Backup Files ===
+*.orig

@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Aug  5 23:20:27 2025
+
+@author: Home
+"""
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
@@ -10,11 +17,11 @@ from django.utils import timezone
 from .models import UserDefinedVariable ,AlgoList, AlgorithmLogic, Broker, AlgoRegister, AlgoStatus, InstrumentList, Condition,TechnicalIndicator,Variable, VariableParameter
 from .forms import CustomUserCreationForm, AlgorithmForm
 from django.core.serializers.json import DjangoJSONEncoder
-from core.utils.condition_utils import save_condition_structure
+from core.utils.condition_utils import save_condition_structure,serialize_conditions
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.safestring import mark_safe
 from django.core.serializers.json import DjangoJSONEncoder
- 
+from django.forms.models import model_to_dict
 
 
 # ---------- Signup ----------
@@ -213,7 +220,9 @@ def add_algo(request):
         
         expiries = request.POST.getlist("expiry_date[]")
         strikes = request.POST.getlist("strike_price[]")
-
+        order_directions = request.POST.getlist("order_direction[]")
+        order_types = request.POST.getlist("order_type[]")
+        option_types = request.POST.getlist("option_type[]")
         for i in range(len(instruments)):
             logic = AlgorithmLogic.objects.create(
                 algo=algo,
@@ -221,8 +230,9 @@ def add_algo(request):
                 instrument_name=instruments[i],
                 expiry_date=expiries[i],
                 strike_price=strikes[i],
-                option_type=order_direction,   # Buy or Sell
-                order_type=order_type          # Market/Limit/LimitThenMarket
+                option_type=option_types[i],          # ✅
+                order_direction=order_directions[i],  # ✅
+                order_type=order_types[i]
             )
 
             # Entry conditions
@@ -327,45 +337,93 @@ def save_condition_structure(algo_logic, conditions, condition_type='entry', par
 
 
 # ---------- Edit Algo ----------
+
+@login_required
 def edit_algo(request, id):
-    algo = get_object_or_404(AlgoList, id=id)  # Correct model is AlgoList
-    logic_entries = AlgorithmLogic.objects.filter(algo=algo)
+    algo = get_object_or_404(AlgoList, id=id)
+    logic_entries = list(AlgorithmLogic.objects.filter(algo=algo))
+    user_variables = list(UserDefinedVariable.objects.filter(algo=algo, user=request.user))
 
     if request.method == 'POST':
-        form = AlgorithmForm(request.POST, instance=algo)
-        if form.is_valid():
-            form.save()
+        # TODO: add logic to update algo, variables, conditions
+        pass
 
-            # Delete old logic rows
-            AlgorithmLogic.objects.filter(algo=algo).delete()
-            logic_count = len(request.POST.getlist('instrument_name[]'))
+    # Prepare instruments (same as add view)
+    instruments = InstrumentList.objects.all()
+    grouped = {}
+    all_symbols = []
+    for inst in instruments:
+        name = inst.name
+        symbol = inst.symbol
+        all_symbols.append(symbol)
+        if name not in grouped:
+            grouped[name] = {"expiries": set(), "strikes": set()}
+        if inst.expiry:
+            grouped[name]["expiries"].add(inst.expiry)
+        if inst.strike:
+            grouped[name]["strikes"].add(inst.strike)
 
-            for i in range(logic_count):
-                AlgorithmLogic.objects.create(
-                    algo=algo,
-                    instrument_name=request.POST.getlist('instrument_name[]')[i],
-                    expiry_date=request.POST.getlist('expiry_date[]')[i],
-                    strike_price=request.POST.getlist('strike_price[]')[i],
-                    option_type=request.POST.getlist('option_type[]')[i],
-                    order_type=request.POST.getlist('order_type[]')[i],
-                    entry_condition=request.POST.getlist('entry_condition[]')[i],
-                    exit_condition=request.POST.getlist('exit_condition[]')[i]
-                )
-            return redirect('algo_list')
-    else:
-        form = AlgorithmForm(instance=algo)
-
-    field_names = [
-        "instrument_name", "expiry_date", "strike_price",
-        "option_type", "order_type", "entry_condition", "exit_condition"
+    instruments_json = [
+        {
+            "name": k,
+            "expiries": sorted(grouped[k]["expiries"]),
+            "strikes": sorted(grouped[k]["strikes"])
+        } for k in grouped
     ]
+    symbol_list_json = json.dumps(sorted(set(all_symbols)))
 
-    return render(request, 'algorelated/edit_algo.html', {
-        'form': form,
-        'logic_entries': logic_entries,
-        'field_names': field_names,
-        'algo': algo
+    # Technical indicators
+    variables = Variable.objects.prefetch_related('parameters').all()
+    indicators_json = json.dumps([
+        {
+            'name': v.name,
+            'display_name': v.display_name,
+            'category': v.category.name if v.category else 'uncategorized',
+            'parameters': [
+                {
+                    'name': p.name,
+                    'input_type': p.input_type,
+                    'default_value': p.default_value,
+                    'source_model': p.source_model,
+                    'source_field': p.source_field,
+                    'description': p.description,
+                } for p in v.parameters.all()
+            ]
+        } for v in variables
+    ], cls=DjangoJSONEncoder)
+
+    # Serialize user-defined variables
+    user_vars_json = json.dumps([
+        {"name": v.name, "expression": v.expression} for v in user_variables
+    ], cls=DjangoJSONEncoder)
+
+    # Serialize existing conditions
+    legs_data = []
+    for leg in logic_entries:
+        legs_data.append({
+            "num_stocks": leg.num_stocks,
+            "instrument_name": leg.instrument_name,
+            "expiry_date": leg.expiry_date,
+            "strike_price": leg.strike_price,
+            "option_type": leg.option_type,
+            "order_type": leg.order_type,
+            "entry_conditions": serialize_conditions(leg, "entry"),
+            "exit_conditions": serialize_conditions(leg, "exit"),
+        })
+
+    return render(request, "algorelated/add_algo.html", {
+        "algo": algo,
+        "is_edit_mode": True,
+        "instruments_json": instruments_json,
+        "symbol_list_json": symbol_list_json,
+        "indicators_json": indicators_json,
+        "user_vars_json": [
+        {"name": v.name, "expression": v.expression} for v in user_variables
+    ],
+        "legs_json": legs_data,
+        "editing":True
     })
+
 #--------Algo list-------#
 def algo_list(request):
     algos = AlgoList.objects.all()
