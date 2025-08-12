@@ -2,22 +2,13 @@ instruments         = window.instruments;
 indicators          = window.indicators;
 all_symbols         = window.all_symbols;
 
-let userDefinedVariables  = [];
+userDefinedVariables  = window.userDefinedVariables || [];
+legs=window.legs
 
 // if we’re in edit mode, user-vars-data was already rendered in the template
-if (window.isEditMode) {
-  const userVarsEl = document.getElementById("user-vars-data");
-  if (userVarsEl) {
-    try {
-      userDefinedVariables = JSON.parse(userVarsEl.textContent);
-    } catch (e) {
-      console.error("Failed to parse user-vars-data:", e);
-    }
-  }
-}
 
 // 3. Your existing helpers
-const legs = JSON.parse(document.getElementById("legs-data").textContent);
+//const legs = JSON.parse(document.getElementById("legs-data").textContent);
 
 function fuzzyMatchScore(symbol, query) {
   if (!query || !symbol) return 0;

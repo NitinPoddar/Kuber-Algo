@@ -1,0 +1,79 @@
+{% extends "core/base.html" %}
+{% block content %}
+<section class="section">
+  <div class="container" style="max-width:640px">
+    <h1 class="title">Add broker account</h1>
+
+    <div class="box">
+      <form id="addForm">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="field">
+          <label class="label">Label</label>
+          <input class="input" name="label" required placeholder="e.g. Zerodha Live">
+        </div>
+
+        <div class="field">
+          <label class="label">Broker</label>
+          <div class="select is-fullwidth">
+            <select name="broker_id" required>
+              <option value="" disabled selected>Select broker…</option>
+              {% for b in brokers %}
+                <option value="{{ b.id }}">{{ b.broker_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Broker username / Client ID</label>
+          <input class="input" name="broker_username" required>
+        </div>
+
+        <div class="field">
+          <label class="label">Credentials (JSON, optional)</label>
+          <textarea class="textarea" name="credentials" placeholder='{"api_key":"...", "secret_key":"..."}'></textarea>
+        </div>
+
+        <div class="is-flex is-justify-content-space-between is-align-items-center">
+          <div id="err" class="has-text-danger is-size-7" style="display:none;"></div>
+          <div>
+            <a class="button" href="{{ next }}">Cancel</a>
+            <button class="button is-primary" type="submit">Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){for(const c of document.cookie.split(';')){const ck=c.trim();if(ck.startsWith(name+'=')){v=decodeURIComponent(ck.slice(name.length+1));break;}}}return v;}
+const csrftoken=getCookie('csrftoken');
+
+document.getElementById('addForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const f=e.currentTarget;
+  const next=f.querySelector('[name="next"]').value;
+  const payload={
+    label:f.label.value.trim(),
+    broker_id:parseInt(f.broker_id.value,10),
+    broker_username:f.broker_username.value.trim()
+  };
+  const creds=f.credentials.value.trim();
+  if(creds){ try{ payload.credentials=JSON.parse(creds);}catch{showErr('Credentials must be valid JSON.'); return;} }
+
+  const res=await fetch('/api/env/accounts/',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':csrftoken},
+    body:JSON.stringify(payload)
+  });
+  const data=await res.json();
+  if(data && data.success){ window.location = next || '/dashboard/'; }
+  else{ showErr((data && data.error) || 'Failed to add account.'); }
+});
+
+function showErr(msg){const el=document.getElementById('err'); el.textContent=msg; el.style.display='block';}
+</script>
+{% endblock %}

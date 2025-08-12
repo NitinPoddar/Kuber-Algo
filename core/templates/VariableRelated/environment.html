@@ -1,0 +1,583 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<html lang="en">
+  <meta charset="UTF-8">
+  <title>Environment</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<body>
+<section class="section">
+  <div class="container">
+    <h1 class="title">Environment</h1>
+
+    <!-- 1) Broker Accounts -->
+    <div class="box">
+      <div class="is-flex is-justify-content-space-between mb-3">
+        <h2 class="subtitle">Broker Accounts</h2>
+        <button class="button is-small is-info" id="addAccBtn">➕ Add Account</button>
+      </div>
+      <div id="accTableArea"></div>
+    </div>
+
+    <!-- 2) Algo ↔ Account Links -->
+    <div class="box mt-5">
+      <div class="is-flex is-justify-content-space-between mb-3">
+        <h2 class="subtitle">Algo ↔ Account Links</h2>
+        <button class="button is-small is-info" id="addLinkBtn">➕ Link Account</button>
+      </div>
+      <div class="field is-grouped mb-2">
+        <div class="control">
+          <div class="select">
+            <select id="linkAlgoFilter">
+              <option value="">All Algos</option>
+              {% for a in algos %}
+                <option value="{{ a.id }}">{{ a.algo.algo_name|default:a.id }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="control"><button class="button" id="reloadLinksBtn">Reload</button></div>
+      </div>
+      <div id="linkTableArea"></div>
+    </div>
+
+    <!-- 3) Global Variables -->
+    <div class="box mt-5">
+      <div class="is-flex is-justify-content-space-between mb-3">
+        <h2 class="subtitle">Global Variables</h2>
+        <button class="button is-small is-info" id="addGlobalBtn">➕ Add Global</button>
+      </div>
+      <div class="field is-grouped mb-2">
+        <div class="control">
+          <div class="select">
+            <select id="gvScope">
+              <option value="">All</option>
+              <option value="global">Global</option>
+              <option value="algo">Per Algo</option>
+              <option value="user">My Scope</option>
+            </select>
+          </div>
+        </div>
+        <div class="control" id="algoScopeCtrl" style="display:none;">
+          <div class="select">
+            <select id="gvAlgo">
+              <option value="">Select Algo</option>
+              {% for a in algos %}
+                <option value="{{ a.id }}">{{ a.algo.algo_name|default:a.id }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="control"><button class="button" id="reloadGlobalsBtn">Reload</button></div>
+      </div>
+      <div id="globalTableArea"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Modal: Broker Account -->
+<div class="modal" id="accModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:520px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="accModalTitle">Add Account</p>
+      <button class="delete" aria-label="close" onclick="closeAccModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="accId">
+      <div class="field">
+        <label class="label">Label</label>
+        <input class="input" id="accLabel" placeholder="e.g. Zerodha Main">
+        <p class="help is-danger" id="accLabelDup" style="display:none;">Duplicate label.</p>
+      </div>
+      <div class="field">
+        <label class="label">Broker</label>
+        <div class="select is-fullwidth">
+          <select id="accBroker">
+            {% for b in brokers %}
+              <option value="{{ b.id }}">{{ b.broker_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Broker Username</label>
+        <input class="input" id="accUsername" placeholder="Broker login/ID">
+      </div>
+      <div class="field">
+        <label class="label">Credentials (JSON)
+  <span class="tag is-light is-info ml-2" id="accCredsBadge" style="vertical-align:middle;">saved</span>
+</label>
+<textarea class="textarea" id="accCreds" placeholder='{"api_key":"...","api_secret":"..."}'></textarea>
+<p class="help">Leave blank to keep existing credentials.</p>
+ </div>
+      <div class="field">
+        <label class="checkbox"><input type="checkbox" id="accActive" checked> Active</label>
+      </div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" id="saveAccBtn" onclick="saveAcc()">Save</button>
+        <button class="button" onclick="closeAccModal()">Cancel</button>
+      </div>
+      <div>
+        <button class="button is-info is-light" id="testAccBtn" style="display:none;">Test</button>
+        <button class="button is-danger is-light" id="deleteAccBtn" style="display:none;">Delete</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Modal: Link -->
+<div class="modal" id="linkModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:520px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="linkModalTitle">Link Account to Algo</p>
+      <button class="delete" aria-label="close" onclick="closeLinkModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="linkId">
+      <div class="field">
+        <label class="label">Algo</label>
+        <div class="select is-fullwidth">
+          <select id="linkAlgo">
+            {% for a in algos %}
+              <option value="{{ a.id }}">{{ a.algo.algo_name|default:a.id }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Account</label>
+        <div class="select is-fullwidth">
+          <select id="linkAccount"><!-- filled with accounts --></select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Role</label>
+        <div class="select is-fullwidth">
+          <select id="linkRole">
+            <option value="primary">Primary</option>
+            <option value="hedge">Hedge</option>
+            <option value="paper">Paper</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="checkbox"><input type="checkbox" id="linkDefault"> Set as default for this algo</label>
+      </div>
+      <div class="field">
+        <label class="label">Settings (JSON)</label>
+        <textarea class="textarea" id="linkSettings" placeholder='{"product":"MIS","slippage_bps":2}'></textarea>
+      </div>
+      <p class="help is-danger" id="linkDup" style="display:none;">This account is already linked to the selected algo.</p>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" id="saveLinkBtn" onclick="saveLink()">Save</button>
+        <button class="button" onclick="closeLinkModal()">Cancel</button>
+      </div>
+      <button class="button is-danger is-light" id="deleteLinkBtn" style="display:none;">Delete</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Modal: Global -->
+<div class="modal" id="globalModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:520px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="gvModalTitle">Add Global</p>
+      <button class="delete" aria-label="close" onclick="closeGvModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="gvId">
+      <div class="field">
+        <label class="label">Key</label>
+        <input class="input" id="gvKey" placeholder="e.g. atr_period">
+        <p class="help is-danger" id="gvDup" style="display:none;">Duplicate key in this scope.</p>
+      </div>
+      <div class="field">
+        <label class="label">Type</label>
+        <div class="select is-fullwidth">
+          <select id="gvType">
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Scope</label>
+        <div class="select is-fullwidth">
+          <select id="gvScopeForm">
+            <option value="global">Global</option>
+            <option value="algo">Per Algo</option>
+            <option value="user">My Scope</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="gvAlgoCtrl" style="display:none;">
+        <label class="label">Algo</label>
+        <div class="select is-fullwidth">
+          <select id="gvAlgoForm">
+            {% for a in algos %}
+              <option value="{{ a.id }}">{{ a.algo.algo_name|default:a.id }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Value</label>
+        <textarea class="textarea" id="gvValue" placeholder='If JSON: {"foo":1}'></textarea>
+      </div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" id="saveGvBtn" onclick="saveGv()">Save</button>
+        <button class="button" onclick="closeGvModal()">Cancel</button>
+      </div>
+      <button class="button is-danger is-light" id="deleteGvBtn" style="display:none;">Delete</button>
+    </footer>
+  </div>
+</div>
+
+<style>.table td,.table th{vertical-align:middle}.select2-container{width:100%!important}</style>
+
+<script>
+// ---- CSRF ----
+function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){const c=document.cookie.split(';');for(let i=0;i<c.length;i++){const ck=c[i].trim();if(ck.substring(0,name.length+1)===(name+'=')){v=decodeURIComponent(ck.substring(name.length+1));break;}}}return v}
+const csrftoken=getCookie('csrftoken');
+$.ajaxSetup({beforeSend:function(xhr,s){if(!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(s.type)){xhr.setRequestHeader("X-CSRFToken",csrftoken);}}});
+
+let accCache=[], linkCache=[], gvCache=[];
+
+// ---------- Accounts ----------
+function loadAccounts(){
+  $.get('/api/env/accounts/', function(d){
+    if(!d.success) return;
+    accCache = d.accounts || [];
+    let html = `
+      <table class="table is-striped is-narrow is-fullwidth">
+        <thead><tr><th>Label</th><th>Broker</th><th>Username</th><th>Status</th><th>Last Test</th><th class="has-text-right">Actions</th></tr></thead>
+        <tbody>
+    `;
+    accCache.forEach(a=>{
+      html += `<tr data-id="${a.id}">
+        <td>${a.label}</td>
+        <td>${a.broker_name}</td>
+        <td>${a.broker_username}</td>
+        <td>${a.is_active ? '<span class="tag is-success is-light">Active</span>' : '<span class="tag is-light">Off</span>'}</td>
+        <td>${a.last_test_ok ? '<span class="tag is-success is-light">OK</span>' : ''} ${a.last_test_at || '—'}</td>
+        <td class="has-text-right">
+          <div class="buttons are-small is-right">
+            <button class="button is-link is-light editAccBtn">Edit</button>
+            <button class="button is-info is-light testAccBtn">Test</button>
+            <button class="button is-danger is-light deleteAccBtn">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    $('#accTableArea').html(html);
+  });
+}
+
+function openAddAcc(){
+  $('#accModalTitle').text('Add Account');
+  $('#accId').val('');
+  $('#accLabel').val('').trigger('input');
+  $('#accBroker').val($('#accBroker option:first').val());
+  $('#accUsername').val('');
+  $('#accCreds').val('');
+  $('#accActive').prop('checked', true);
+  $('#testAccBtn,#deleteAccBtn').hide();
+  $('#accModal').addClass('is-active');
+}
+function openEditAcc(id){
+  const a=accCache.find(x=>String(x.id)===String(id));
+  if(!a) return;
+  $('#accModalTitle').text('Edit Account');
+  $('#accId').val(a.id);
+  $('#accLabel').val(a.label).trigger('input');
+  $('#accBroker').val(a.broker_id);
+  $('#accUsername').val(a.broker_username);
+  $('#accCreds').val(''); // keep hidden; set only if changing
+  $('#accActive').prop('checked', !!a.is_active);
+  $('#testAccBtn,#deleteAccBtn').show();
+  $('#accModal').addClass('is-active');
+}
+function closeAccModal(){ $('#accModal').removeClass('is-active'); }
+
+function saveAcc(){
+  let credsSet = false;
+  let creds = undefined;
+  const raw = $('#accCreds').val().trim();
+  if (raw) {
+    try { creds = JSON.parse(raw); credsSet = true; }
+    catch(e){ alert('Credentials must be valid JSON'); return; }
+  }
+
+  const payload = {
+    label: ($('#accLabel').val()||'').trim(),
+    broker_id: $('#accBroker').val(),
+    broker_username: ($('#accUsername').val()||'').trim(),
+    is_active: $('#accActive').is(':checked')
+  };
+  // only include credentials if user actually entered them
+  if (credsSet) payload.credentials = creds;
+
+  const id = $('#accId').val() || null;
+  const url = id ? `/api/env/account/${id}/` : '/api/env/accounts/';
+  $.ajax({url, method:'POST', contentType:'application/json', data:JSON.stringify(payload)})
+    .done(d=>{ if(d.success){ closeAccModal(); loadAccounts(); } else alert(d.error||'Failed'); });
+}
+
+function deleteAcc(id){
+  if(!confirm('Delete this account?')) return;
+  $.ajax({url:`/api/env/account/${id}/`, method:'DELETE'}).done(d=>{
+    if(d.success){ loadAccounts(); loadLinks(); }
+  });
+}
+function testAcc(id){
+  $.post(`/api/env/account/${id}/test/`, {}, function(d){
+    if(d.success){ loadAccounts(); alert(d.ok? 'Connection OK' : ('Test failed: '+(d.error||''))); }
+  });
+}
+
+// ---------- Links ----------
+function loadLinks(){
+  const algo=$('#linkAlgoFilter').val();
+  let url='/api/env/links/'; if(algo) url+='?algo='+encodeURIComponent(algo);
+  $.get(url, function(d){
+    if(!d.success) return;
+    linkCache=d.links||[];
+    let html=`
+      <table class="table is-striped is-narrow is-fullwidth">
+        <thead><tr><th>Algo</th><th>Account</th><th>Broker</th><th>Role</th><th>Default</th><th class="has-text-right">Actions</th></tr></thead>
+        <tbody>
+    `;
+    linkCache.forEach(l=>{
+      html+=`<tr data-id="${l.id}">
+        <td>${l.algo_name}</td>
+        <td>${l.account_label}</td>
+        <td>${l.broker_name}</td>
+        <td>${l.role}</td>
+        <td>${l.is_default? '✅' : '—'}</td>
+        <td class="has-text-right">
+          <div class="buttons are-small is-right">
+            <button class="button is-link is-light editLinkBtn">Edit</button>
+            <button class="button is-danger is-light deleteLinkBtn">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html+=`</tbody></table>`;
+    $('#linkTableArea').html(html);
+  });
+}
+
+function openAddLink(){
+  $('#linkModalTitle').text('Link Account to Algo');
+  $('#linkId').val('');
+  $('#linkAlgo').val($('#linkAlgoFilter').val() || $('#linkAlgo option:first').val());
+  populateAccountOptions();
+  $('#linkRole').val('primary');
+  $('#linkDefault').prop('checked', false);
+  $('#linkSettings').val('');
+  $('#deleteLinkBtn').hide();
+  $('#linkDup').hide();
+  $('#saveLinkBtn').prop('disabled', false);
+  $('#linkModal').addClass('is-active');
+}
+function openEditLink(id){
+  const l=linkCache.find(x=>String(x.id)===String(id));
+  if(!l) return;
+  $('#linkModalTitle').text('Edit Link');
+  $('#linkId').val(l.id);
+  $('#linkAlgo').val(l.algo_id);
+  populateAccountOptions(function(){
+    $('#linkAccount').val(l.account_id);
+  });
+  $('#linkRole').val(l.role);
+  $('#linkDefault').prop('checked', !!l.is_default);
+  $('#linkSettings').val(JSON.stringify(l.settings||{}, null, 2));
+  $('#deleteLinkBtn').show();
+  $('#linkDup').hide();
+  $('#saveLinkBtn').prop('disabled', false);
+  $('#linkModal').addClass('is-active');
+}
+function closeLinkModal(){ $('#linkModal').removeClass('is-active'); }
+
+function populateAccountOptions(cb){
+  // load fresh accounts for the select
+  $.get('/api/env/accounts/', function(d){
+    if(!d.success) return;
+    const opts = (d.accounts||[]).map(a=>`<option value="${a.id}">${a.label} (${a.broker_name})</option>`).join('');
+    $('#linkAccount').html(opts);
+    if(cb) cb();
+  });
+}
+
+function saveLink(){
+  let settings={}; const raw=$('#linkSettings').val().trim(); if(raw){ try{ settings=JSON.parse(raw);}catch(e){alert('Settings must be valid JSON'); return; } }
+  const payload={
+    algo_id: $('#linkAlgo').val(),
+    account_id: $('#linkAccount').val(),
+    role: $('#linkRole').val(),
+    is_default: $('#linkDefault').is(':checked'),
+    settings: settings
+  };
+  // client dup: same (algo, account)
+  const currentId=$('#linkId').val()||null;
+  const dup=linkCache.some(l=>String(l.algo_id)===String(payload.algo_id) && String(l.account_id)===String(payload.account_id) && String(l.id)!==String(currentId));
+  if(dup){ $('#linkDup').show(); $('#saveLinkBtn').prop('disabled', true); return; }
+
+  const url=currentId? `/api/env/link/${currentId}/` : '/api/env/links/';
+  $.ajax({url, method:'POST', contentType:'application/json', data:JSON.stringify(payload)})
+    .done(d=>{ if(d.success){ closeLinkModal(); loadLinks(); } else alert(d.error||'Failed'); });
+}
+function deleteLink(id){
+  if(!confirm('Delete this link?')) return;
+  $.ajax({url:`/api/env/link/${id}/`, method:'DELETE'}).done(d=>{
+    if(d.success){ loadLinks(); }
+  });
+}
+
+// ---------- Globals ----------
+function loadGlobals(){
+  const scope=$('#gvScope').val(), algo=$('#gvAlgo').val();
+  let url='/api/env/globals/'; const qs=[]; if(scope) qs.push('scope='+encodeURIComponent(scope)); if(scope==='algo'&&algo) qs.push('algo='+encodeURIComponent(algo));
+  if(qs.length) url+='?'+qs.join('&');
+  $.get(url, function(d){
+    if(!d.success) return;
+    gvCache=d.globals||[];
+    let html=`
+      <table class="table is-striped is-narrow is-fullwidth">
+        <thead><tr><th>Key</th><th>Type</th><th>Scope</th><th>Value</th><th class="has-text-right">Actions</th></tr></thead>
+        <tbody>
+    `;
+    gvCache.forEach(g=>{
+      const scopeStr = g.user ? 'User' : (g.algo ? ('Algo#'+g.algo) : 'Global');
+      const preview = g.dtype==='json' ? JSON.stringify(g.value) : (g.value ?? '');
+      html+=`<tr data-id="${g.id}">
+        <td>${g.key}</td><td>${g.dtype}</td><td>${scopeStr}</td>
+        <td style="max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${preview}</td>
+        <td class="has-text-right">
+          <div class="buttons are-small is-right">
+            <button class="button is-link is-light editGvBtn">Edit</button>
+            <button class="button is-danger is-light deleteGvBtn">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html+=`</tbody></table>`;
+    $('#globalTableArea').html(html);
+  });
+}
+
+function openAddGv(){
+  $('#gvModalTitle').text('Add Global');
+  $('#gvId').val('');
+  $('#gvKey').val('').trigger('input');
+  $('#gvType').val('text');
+  $('#gvScopeForm').val('global').trigger('change');
+  $('#gvValue').val('');
+  $('#deleteGvBtn').hide();
+  $('#saveGvBtn').prop('disabled', false);
+  $('#globalModal').addClass('is-active');
+}
+function openEditGv(id){
+  const g=gvCache.find(x=>String(x.id)===String(id)); if(!g) return;
+  $('#gvModalTitle').text('Edit Global');
+  $('#gvId').val(g.id);
+  $('#gvKey').val(g.key).trigger('input');
+  $('#gvType').val(g.dtype);
+  if(g.user){ $('#gvScopeForm').val('user'); }
+  else if(g.algo){ $('#gvScopeForm').val('algo'); $('#gvAlgoForm').val(g.algo); }
+  else { $('#gvScopeForm').val('global'); }
+  $('#gvScopeForm').trigger('change');
+  const val = (g.dtype==='json') ? JSON.stringify(g.value||{}, null, 2) : (g.value ?? '');
+  $('#gvValue').val(val);
+  $('#deleteGvBtn').show();
+  $('#globalModal').addClass('is-active');
+}
+function closeGvModal(){ $('#globalModal').removeClass('is-active'); }
+
+function saveGv(){
+  const key=($('#gvKey').val()||'').trim(); if(!key){ alert('Key required'); return; }
+  const dtype=$('#gvType').val();
+  let value=$('#gvValue').val();
+  if(dtype==='number'){ if(value===''){value=null;} else {const n=Number(value); if(isNaN(n)){alert('Must be number'); return;} value=n;}}
+  if(dtype==='json'){ try{ value=value? JSON.parse(value):null; }catch(e){alert('Invalid JSON'); return; } }
+  const scope=$('#gvScopeForm').val(); const algo=(scope==='algo')? $('#gvAlgoForm').val():null;
+
+  const id=$('#gvId').val()||null;
+  const dup = gvCache.some(g=>{
+    const sameKey=g.key.toLowerCase()===key.toLowerCase();
+    const sameScope=(scope==='user'&&g.user)||(scope==='algo'&&String(g.algo)===String(algo))||(scope==='global'&&!g.user&&!g.algo);
+    return sameKey && sameScope && String(g.id)!==String(id);
+  });
+  if(dup){ $('#gvDup').show(); $('#saveGvBtn').prop('disabled', true); return; }
+
+  const payload={key, dtype, value, scope, algo};
+  const url=id? `/api/env/global/${id}/` : '/api/env/globals/';
+  $.ajax({url, method:'POST', contentType:'application/json', data:JSON.stringify(payload)})
+    .done(d=>{ if(d.success){ closeGvModal(); loadGlobals(); } else alert(d.error||'Failed'); });
+}
+function deleteGv(id){
+  if(!confirm('Delete this global?')) return;
+  $.ajax({url:`/api/env/global/${id}/`, method:'DELETE'}).done(d=>{ if(d.success) loadGlobals(); });
+}
+
+// ---------- Wiring ----------
+$(function(){
+  loadAccounts(); loadLinks(); loadGlobals();
+
+  // accounts
+  $('#addAccBtn').on('click', openAddAcc);
+  $('#accTableArea').on('click', '.editAccBtn', function(){ openEditAcc($(this).closest('tr').data('id')); });
+  $('#accTableArea').on('click', '.deleteAccBtn', function(){ deleteAcc($(this).closest('tr').data('id')); });
+  $('#accTableArea').on('click', '.testAccBtn', function(){ testAcc($(this).closest('tr').data('id')); });
+  $('#accLabel').on('input', function(){ $('#accLabelDup').hide(); $('#saveAccBtn').prop('disabled', false); });
+
+  // links
+  $('#addLinkBtn').on('click', openAddLink);
+  $('#reloadLinksBtn').on('click', loadLinks);
+  $('#linkAlgoFilter').on('change', function(){ /* optional auto reload */ });
+  $('#linkTableArea').on('click', '.editLinkBtn', function(){ openEditLink($(this).closest('tr').data('id')); });
+  $('#linkTableArea').on('click', '.deleteLinkBtn', function(){ deleteLink($(this).closest('tr').data('id')); });
+
+  // globals
+  $('#gvScope').on('change', function(){ $('#algoScopeCtrl').toggle($(this).val()==='algo'); });
+  $('#reloadGlobalsBtn').on('click', loadGlobals);
+  $('#addGlobalBtn').on('click', openAddGv);
+  $('#globalTableArea').on('click', '.editGvBtn', function(){ openEditGv($(this).closest('tr').data('id')); });
+  $('#globalTableArea').on('click', '.deleteGvBtn', function(){ deleteGv($(this).closest('tr').data('id')); });
+  $('#gvScopeForm').on('change', function(){ $('#gvAlgoCtrl').toggle($(this).val()==='algo'); });
+  $('#gvKey').on('input', function(){ $('#gvDup').hide(); $('#saveGvBtn').prop('disabled', false); });
+
+  // modal footer quick actions
+  $('#testAccBtn').on('click', function(){ const id=$('#accId').val(); if(id) testAcc(id); });
+  $('#deleteAccBtn').on('click', function(){ const id=$('#accId').val(); if(id) deleteAcc(id); });
+  $('#deleteLinkBtn').on('click', function(){ const id=$('#linkId').val(); if(id) deleteLink(id); });
+});
+
+// Auto open "Add Account" if ?add=account
+(function(){
+  const p=new URLSearchParams(location.search);
+  if(p.get('add')==='account'){ openAddAcc(); }
+})();
+
+</script>
+
+</body>
+</html>
+{% endblock %}

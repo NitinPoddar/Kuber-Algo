@@ -4,58 +4,86 @@
 {% block content %}
 <section class="section">
   <div class="container">
-    <div class="column is-4 is-offset-4">
-      <h3 class="title has-text-centered">Add Broker</h3>
-
-      <form method="POST" action="{% url 'add_broker' %}">
-        {% csrf_token %}
-
-        <div class="field">
-          <div class="control">
-            <input class="input is-large" type="text" name="BrokerName" placeholder="Broker Name" required>
+    <div class="columns is-centered">
+      <div class="column is-6-tablet is-5-desktop is-4-widescreen">
+        <div class="box">
+          <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+            <h3 class="title is-4 m-0">Add Broker</h3>
+            <a class="button is-light is-small" href="{% url 'profile' %}">Back</a>
           </div>
-        </div>
 
-        <div class="field">
-          <div class="control">
-            <input class="input is-large" type="text" name="RootAPI" placeholder="Root API" required>
-          </div>
-        </div>
+          <form method="POST" action="{% url 'add_broker' %}">
+            {% csrf_token %}
 
-        <div class="field">
-          <div class="control">
-            <input class="input is-large" type="text" name="ServerIP" placeholder="Server IP" required>
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="AuthenticatorReq" class="label">Authenticator Required:</label>
-          <div class="control">
-            <div class="select is-fullwidth">
-              <select id="AuthenticatorReq" name="AuthenticatorReq" required>
-                <option value="1">1</option>
-                <option value="0">0</option>
-              </select>
+            <div class="field">
+              <label class="label">Broker Name</label>
+              <div class="control">
+                <input class="input" type="text" name="BrokerName" placeholder="e.g. Zerodha, Fyers" required>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div class="field">
-          <label for="PasswordReq" class="label">Password Required:</label>
-          <div class="control">
-            <div class="select is-fullwidth">
-              <select id="PasswordReq" name="PasswordReq" required>
-                <option value="1">1</option>
-                <option value="0">0</option>
-              </select>
+            <div class="field">
+              <label class="label">Root API</label>
+              <div class="control">
+                <input class="input" type="url" name="RootAPI" placeholder="https://api.broker.com" required>
+              </div>
+              <p class="help">Base URL for the broker’s public API.</p>
             </div>
-          </div>
+
+            <div class="field">
+              <label class="label">Server IP (optional)</label>
+              <div class="control">
+                <input class="input" type="text" name="ServerIP" placeholder="e.g. 192.168.1.10">
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Authenticator Required</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="AuthenticatorReq" name="AuthenticatorReq" required>
+                    <option value="1">Yes</option>
+                    <option value="0" selected>No</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Password Required</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="PasswordReq" name="PasswordReq" required>
+                    <option value="1">Yes</option>
+                    <option value="0" selected>No</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- NEW: Adapter Path -->
+            <div class="field">
+              <label class="label">Adapter Path</label>
+              <div class="control">
+                <input class="input" type="text" name="AdapterPath"
+                       placeholder="core.services.brokers.zerodha:ZerodhaClient" required>
+              </div>
+              <p class="help">
+                Dotted import path to the broker client class, e.g.
+                <code>core.services.brokers.zerodha:ZerodhaClient</code>.
+              </p>
+            </div>
+
+            <div class="field mt-5">
+              <button class="button is-primary is-fullwidth">Add Broker</button>
+            </div>
+          </form>
         </div>
 
-        <button class="button is-block is-info is-large is-fullwidth mt-4" style="background-color: #041A73;">
-          Add Broker
-        </button>
-      </form>
+        <p class="has-text-grey is-size-7 has-text-centered">
+          You can add accounts for this broker on the <a href="{% url 'environment' %}">Environment</a> page.
+        </p>
+      </div>
     </div>
   </div>
 </section>

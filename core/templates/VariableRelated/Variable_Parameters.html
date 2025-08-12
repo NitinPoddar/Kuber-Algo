@@ -1,0 +1,811 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<html lang="en">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Variables & Parameters</title>
+  <!-- Bulma CSS, Select2, Inter Font -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+
+<body>
+<section class="section">
+  <div class="container">
+    <h1 class="title">Variable & Parameter Management</h1>
+
+    <div class="columns">
+      <!-- Category Sidebar -->
+      <div class="column is-2">
+        <aside class="menu">
+          <p class="menu-label">Categories</p>
+          <ul class="menu-list" id="category-list">
+            {% for cat in categories %}
+              <li>
+                <a href="#" class="cat-link {% if current_category and cat.id == current_category.id %}is-active{% endif %}"
+                   data-category="{{ cat.id }}">{{ cat.name }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+          <button class="button is-small is-info mt-2" id="addCategoryBtn">➕ Add Category</button>
+        </aside>
+      </div>
+
+      <!-- Main Column: Variables table then Parameter Manager below -->
+      <div class="column is-10">
+        <!-- Variables -->
+        <div class="is-flex is-justify-content-space-between mb-2">
+          <h2 class="subtitle">Variables in <span class="has-text-link" id="catNameDisplay">{{ current_category.name }}</span></h2>
+          <button class="button is-primary is-small" id="addVariableBtn">➕ Add Variable</button>
+        </div>
+
+        <table class="table is-striped is-narrow is-fullwidth">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Display</th>
+              <th>Parameters</th>
+              <th>Function</th>
+              <th class="has-text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="variable-table-body">
+            {% for var in variables %}
+              <tr data-var-id="{{ var.id }}">
+                <td>{{ var.name }}</td>
+                <td>{{ var.display_name }}</td>
+                <td>
+                  {% for p in var.parameters.all %}
+                    <span class="tag is-light">{{ p.name }}</span>
+                  {% empty %}
+                    <span class="has-text-grey">—</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if var.function_code %}
+                    <code class="is-family-monospace" style="font-size:12px;">{{ var.function_code|slice:":30" }}...</code>
+                    <a href="#" class="button is-small is-light ml-1 viewCodeBtn">View</a>
+                  {% else %}
+                    <a href="#" class="button is-small is-warning ml-1 editCodeBtn">Add</a>
+                  {% endif %}
+                </td>
+                <td class="has-text-right">
+                  <div class="buttons are-small is-right">
+                    <button class="button is-link editVarBtn">Edit</button>
+                    <button class="button is-danger is-light deleteVarBtn">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <!-- Parameter Manager (below) -->
+        <div class="box mt-5">
+          <div class="is-flex is-justify-content-space-between mb-2">
+            <h2 class="subtitle">Parameter Manager</h2>
+            <button class="button is-small is-info" id="addParameterBtn">➕ Add Parameter</button>
+          </div>
+          <div id="paramTableArea"><!-- filled by JS --></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Add Category Modal -->
+<div class="modal" id="addCategoryModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:400px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Add Category</p>
+      <button class="delete" aria-label="close" onclick="closeAddCategoryModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Category Name</label>
+        <input class="input" type="text" id="newCategoryName" placeholder="Enter category name">
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-primary" onclick="saveNewCategory()">Save</button>
+      <button class="button" onclick="closeAddCategoryModal()">Cancel</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Add/Edit Parameter Modal -->
+<div class="modal" id="addParameterModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:420px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="paramModalTitle">Add Parameter</p>
+      <button class="delete" aria-label="close" onclick="closeAddParameterModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="paramId">
+      <div class="field">
+        <label class="label">Name</label>
+        <input class="input" type="text" id="paramName" placeholder="Parameter name">
+        <p class="help is-danger" id="paramNameDup" style="display:none;">Name already exists.</p>
+      </div>
+      <div class="field">
+        <label class="label">Description</label>
+        <input class="input" type="text" id="paramDescription" placeholder="Parameter description">
+      </div>
+      <div class="field">
+        <label class="label">Input Type</label>
+        <div class="select is-fullwidth">
+          <select id="paramInputType">
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+            <option value="select">Select (dropdown)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="allowedValuesField" style="display:none;">
+        <label class="label">Allowed Values (comma separated)</label>
+        <input class="input" type="text" id="paramAllowedValues" placeholder="e.g. up,down,hold">
+      </div>
+      <div class="field">
+        <label class="label">Default Value</label>
+        <input class="input" type="text" id="paramDefaultValue" placeholder="Default value (optional)">
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-primary" id="saveParamBtn" onclick="saveParameter()">Save</button>
+      <button class="button" onclick="closeAddParameterModal()">Cancel</button>
+      <button class="button is-danger is-light" id="deleteParameterBtn" style="display:none;">Delete</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Variable Modal (Add/Edit) -->
+<div class="modal" id="variableModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:720px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="varModalTitle">Edit Variable</p>
+      <button class="delete" aria-label="close" onclick="closeVariableModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <form id="variableForm">
+        <input type="hidden" id="variable_id">
+        <div class="field">
+          <label class="label">Name</label>
+          <input class="input" type="text" id="varName" required>
+          <p class="help is-danger" id="varNameDup" style="display:none;">Name already exists.</p>
+        </div>
+        <div class="field">
+          <label class="label">Display Name</label>
+          <input class="input" type="text" id="varDisplay" required>
+        </div>
+        <div class="field">
+          <label class="label">Category</label>
+          <select class="select2" id="varCategory" required>
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Parameters</label>
+          <select class="select2" multiple id="varParameters">
+            {% for param in all_parameters %}
+              <option value="{{ param.id }}">{{ param.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Description</label>
+          <textarea class="textarea" id="varDescription"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="label">Function Code</label>
+          <div id="codeBlockArea" class="box" style="display:block;">
+            <pre><code id="codePreview"></code></pre>
+            <button type="button" class="button is-small is-link" onclick="showEditor(true)">✎ Edit Function Code</button>
+          </div>
+          <div id="codeEditorArea" style="display:none;">
+            <div id="aceEditor" style="height:170px;width:100%;"></div>
+            <div class="buttons mt-2">
+              <button type="button" class="button is-small is-success" onclick="saveCode()">💾 Save Code</button>
+              <button type="button" class="button is-small" onclick="openTestModal()">🧪 Test</button>
+              <button type="button" class="button is-small is-light" onclick="showEditor(false)">Cancel</button>
+            </div>
+            <div id="testResult" class="notification mt-2 is-hidden"></div>
+          </div>
+        </div>
+
+        <div class="field is-grouped mt-4 is-justify-content-space-between">
+          <div class="buttons">
+            <button type="submit" class="button is-primary" id="saveVarBtn">Save</button>
+            <button type="button" class="button" onclick="closeVariableModal()">Cancel</button>
+          </div>
+          <button type="button" class="button is-danger is-light" id="deleteVarInModal" style="display:none;">Delete</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<style>
+.select2-container { min-width: 100%; width: 100% !important; }
+.modal-card-head { background: #f5f5f5; }
+</style>
+<!-- Test Settings Modal -->
+<div class="modal" id="testModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:560px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Test Settings</p>
+      <button class="delete" aria-label="close" onclick="closeTestModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="columns is-multiline">
+        <div class="column is-half">
+          <label class="label">Algo Context</label>
+          <div class="select is-fullwidth">
+            <select id="tAlgo"></select>
+          </div>
+          <p class="help">Used to merge Global → Algo → User vars.</p>
+        </div>
+        <div class="column is-half">
+          <label class="label">Mode</label>
+          <div class="select is-fullwidth">
+            <select id="tMode">
+              <option value="paper">paper</option>
+              <option value="live">live</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="column is-half">
+          <label class="label">Account (optional)</label>
+          <div class="select is-fullwidth">
+            <select id="tAccount">
+              <option value="">(let env pick)</option>
+            </select>
+          </div>
+          <p class="help">If empty, env picks a linked account for the chosen mode.</p>
+        </div>
+        <div class="column is-half">
+          <label class="checkbox" style="margin-top:2.2rem;">
+            <input type="checkbox" id="tUseLive"> Use live broker data
+          </label>
+          <p class="help">Unchecked = mock candles/positions.</p>
+        </div>
+
+        <div class="column is-one-third">
+          <label class="label">Symbol</label>
+          <input class="input" id="tSymbol" value="NIFTY">
+        </div>
+        <div class="column is-one-third">
+          <label class="label">Timeframe</label>
+          <input class="input" id="tTimeframe" value="5m">
+        </div>
+        <div class="column is-one-third">
+          <label class="label">Lookback</label>
+          <input class="input" id="tLookback" type="number" value="120">
+        </div>
+
+        <div class="column is-full">
+          <label class="label">Inputs (JSON override, optional)</label>
+          <textarea class="textarea" id="tInputs" placeholder='{"symbol":"NIFTY","timeframe":"5m","candles":[...],"positions":[...]}'></textarea>
+        </div>
+
+        <div class="column is-full">
+          <article id="tFlash" class="message is-hidden"><div class="message-body"></div></article>
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" onclick="runVariableTest()">Run Test</button>
+        <button class="button" onclick="closeTestModal()">Close</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script>
+// ---- CSRF (if you enable CSRF on POST/DELETE) ----
+function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){const c=document.cookie.split(';');for(let i=0;i<c.length;i++){const ck=c[i].trim();if(ck.substring(0,name.length+1)===(name+'=')){v=decodeURIComponent(ck.substring(name.length+1));break;}}}return v}
+const csrftoken=getCookie('csrftoken');
+$.ajaxSetup({beforeSend:function(xhr,s){if(!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(s.type)){xhr.setRequestHeader("X-CSRFToken",csrftoken);}}});
+// --------------------------------------------------
+
+let aceEditor=null;
+let allParamsCache=[];   // for duplicate checks & names
+let allVarsCache=[];     // for duplicate checks & usage checks
+
+$(document).ready(function(){
+  $('.select2').select2({ width:'100%' });
+
+  // initial caches
+  refreshParamCache();
+  refreshVarCache();
+
+  // load parameters table
+  loadParameters();
+
+  // Category click
+  $('#category-list').on('click','.cat-link',function(e){
+    e.preventDefault();
+    const catId=$(this).data('category');
+    $('#catNameDisplay').text($(this).text());
+    loadVariables(catId);
+    $('.cat-link').removeClass('is-active');
+    $(this).addClass('is-active');
+  });
+
+  // Variables delegated actions
+  $('#variable-table-body').on('click','.editVarBtn',function(){
+    const varId=$(this).closest('tr').data('var-id');
+    openEditVariable(varId);
+  });
+  $('#variable-table-body').on('click','.viewCodeBtn',function(){
+    const varId=$(this).closest('tr').data('var-id');
+    $.get(`/api/variable/${varId}/`,function(d){ if(d.success){ alert(d.variable.function_code || 'No function code'); }});
+  });
+  $('#variable-table-body').on('click','.editCodeBtn',function(){
+    const varId=$(this).closest('tr').data('var-id');
+    openEditVariable(varId,true);
+  });
+  $('#variable-table-body').on('click','.deleteVarBtn',function(){
+    const varId=$(this).closest('tr').data('var-id');
+    deleteVariable(varId);
+  });
+
+  // Add Variable
+  $('#addVariableBtn').on('click',function(){
+    resetVariableForm();
+    $('#variableModal').addClass('is-active');
+  });
+
+  // Save Variable
+  $('#variableForm').on('submit',function(e){
+    e.preventDefault();
+    saveVariable();
+  });
+
+  // Delete in modal
+  $('#deleteVarInModal').on('click',function(){
+    const varId=$('#variable_id').val();
+    if(varId) deleteVariable(varId);
+  });
+
+  // Real-time duplicate check: Variable name
+  $('#varName').on('input', function(){
+    const currentId = $('#variable_id').val() || null;
+    const name = ($(this).val()||'').trim().toLowerCase();
+    const dup = allVarsCache.some(v => v.name.toLowerCase()===name && String(v.id)!==String(currentId));
+    $('#varNameDup').toggle(dup);
+    $('#saveVarBtn').prop('disabled', dup);
+  });
+
+  // Category modal
+  $('#addCategoryBtn').on('click', function(){
+    $('#addCategoryModal').addClass('is-active');
+    setTimeout(()=>$('#newCategoryName').focus(),100);
+  });
+
+  // Parameter add button
+  $('#addParameterBtn').on('click',function(){ openAddParameterModal(); });
+
+  // Param form type toggle
+  $('#paramInputType').on('change', function(){
+    $(this).val()==='select' ? $('#allowedValuesField').show() : $('#allowedValuesField').hide();
+  });
+
+  // Param delete in modal
+  $('#deleteParameterBtn').on('click', function(){
+    const id=$('#paramId').val();
+    if(!id) return;
+    confirmDeleteParameter(id);
+  });
+
+  // Real-time duplicate check: Parameter name
+  $('#paramName').on('input', function(){
+    const currentId = $('#paramId').val() || null;
+    const name = ($(this).val()||'').trim().toLowerCase();
+    const dup = allParamsCache.some(p => p.name.toLowerCase()===name && String(p.id)!==String(currentId));
+    $('#paramNameDup').toggle(dup);
+    $('#saveParamBtn').prop('disabled', dup);
+  });
+});
+
+// ---------- Variables ----------
+function openEditVariable(id, openCodeEditor=false){
+  $.get(`/api/variable/${id}/`, function(d){
+    if(!d.success) return;
+    const v=d.variable;
+    $('#variable_id').val(v.id);
+    $('#varName').val(v.name).trigger('input'); // trigger dup check
+    $('#varDisplay').val(v.display_name);
+    $('#varCategory').val(v.category).trigger('change');
+    $('#varParameters').val(v.parameters).trigger('change');
+    $('#varDescription').val(v.description||'');
+    $('#codePreview').text(v.function_code||'');
+    showEditor(!!openCodeEditor);
+    $('#deleteVarInModal').show();
+    $('#variableModal').addClass('is-active');
+  });
+}
+
+function resetVariableForm(){
+  $('#variableForm')[0].reset();
+  $('#variable_id').val('');
+  $('#varCategory').val($('.cat-link.is-active').data('category')||'').trigger('change');
+  $('#varParameters').val([]).trigger('change');
+  $('#codePreview').text('');
+  showEditor(false);
+  $('#varNameDup').hide();
+  $('#saveVarBtn').prop('disabled', false);
+  $('#deleteVarInModal').hide();
+}
+
+function renderVariablesTable(vars){
+  let html='';
+  vars.forEach(function(v){
+    const names=(v.parameters||[]).map(id=>$('#varParameters option[value="'+id+'"]').text()).filter(Boolean).join(', ');
+    html+=`<tr data-var-id="${v.id}">
+      <td>${v.name}</td>
+      <td>${v.display_name}</td>
+      <td>${names || '<span class="has-text-grey">—</span>'}</td>
+      <td>${
+        v.function_code
+          ? `<code>${(v.function_code||'').substring(0,30)}...</code><a href="#" class="button is-small is-light ml-1 viewCodeBtn">View</a>`
+          : '<a href="#" class="button is-small is-warning ml-1 editCodeBtn">Add</a>'
+      }</td>
+      <td class="has-text-right">
+        <div class="buttons are-small is-right">
+          <button class="button is-link editVarBtn">Edit</button>
+          <button class="button is-danger is-light deleteVarBtn">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  $('#variable-table-body').html(html);
+}
+
+function loadVariables(categoryId){
+  $.get('/api/variables/?category='+categoryId, function(d){
+    if(d.success){
+      renderVariablesTable(d.variables);
+      refreshVarCache(); // keep names fresh for dup checks
+    }
+  });
+}
+
+function saveVariable(){
+  const payload={
+    name: $('#varName').val(),
+    display_name: $('#varDisplay').val(),
+    category: $('#varCategory').val(),
+    parameters: $('#varParameters').val(),
+    description: $('#varDescription').val(),
+    function_code: $('#codePreview').text()
+  };
+  const varId=$('#variable_id').val();
+  const url=varId? `/api/variable/${varId}/` : '/api/variables/';
+  $.ajax({
+    url, method:'POST', contentType:'application/json', data:JSON.stringify(payload),
+    success: function(resp){
+      if(resp.success){
+        closeVariableModal();
+        const catId=$('.cat-link.is-active').data('category');
+        loadVariables(catId);
+      }
+    }
+  });
+}
+
+function deleteVariable(varId){
+  if(!confirm('Delete this variable?')) return;
+  $.ajax({
+    url:`/api/variable/${varId}/`, method:'DELETE',
+    success:function(resp){
+      if(resp.success){
+        const catId=$('.cat-link.is-active').data('category');
+        loadVariables(catId);
+        refreshVarCache();
+      }
+    }
+  });
+}
+
+function closeVariableModal(){ $('#variableModal').removeClass('is-active'); }
+
+function showEditor(show){
+  $('#codeBlockArea').toggle(!show);
+  $('#codeEditorArea').toggle(show);
+  if(show && !aceEditor){
+    aceEditor=ace.edit('aceEditor');
+    aceEditor.session.setMode('ace/mode/python');
+    aceEditor.setValue($('#codePreview').text()||'', -1);
+  } else if(show && aceEditor){
+    aceEditor.setValue($('#codePreview').text()||'', -1);
+  }
+}
+
+function saveCode(){
+  const code=aceEditor? aceEditor.getValue() : '';
+  $('#codePreview').text(code);
+  showEditor(false);
+}
+
+
+// ---------- Parameters ----------
+function renderParametersTable(params){
+  let html = `
+    <table class="table is-striped is-narrow is-fullwidth">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Default</th>
+          <th>Allowed Values</th>
+          <th class="has-text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  params.forEach(function(p){
+    html += `
+      <tr data-param-id="${p.id}">
+        <td>${p.name}</td>
+        <td>${p.input_type}</td>
+        <td>${p.default_value || ''}</td>
+        <td>${
+          p.input_type==='select' ? (p.allowed_values || '') : '<span class="has-text-grey">N/A</span>'
+        }</td>
+        <td class="has-text-right">
+          <div class="buttons are-small is-right">
+            <button class="button is-link is-light editParamBtn">Edit</button>
+            <button class="button is-danger is-light deleteParamBtn">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+  html += `</tbody></table>`;
+  $('#paramTableArea').html(html);
+
+  // Delegated actions
+  $('#paramTableArea').off('click','.editParamBtn').on('click','.editParamBtn',function(){
+    const id=$(this).closest('tr').data('param-id'); openEditParameterModal(id);
+  });
+  $('#paramTableArea').off('click','.deleteParamBtn').on('click','.deleteParamBtn',function(){
+    const id=$(this).closest('tr').data('param-id'); confirmDeleteParameter(id);
+  });
+}
+
+function loadParameters(){
+  $.get('/api/parameters/', function(d){
+    if(d.success){
+      renderParametersTable(d.parameters);
+      allParamsCache = d.parameters || [];
+    }
+  });
+}
+
+function openAddParameterModal(){
+  $('#paramModalTitle').text('Add Parameter');
+  $('#paramId').val('');
+  $('#paramName').val('').trigger('input');
+  $('#paramDescription').val('');
+  $('#paramInputType').val('text').trigger('change');
+  $('#paramAllowedValues').val('');
+  $('#paramDefaultValue').val('');
+  $('#allowedValuesField').hide();
+  $('#deleteParameterBtn').hide();
+  $('#saveParamBtn').prop('disabled', false);
+  $('#addParameterModal').addClass('is-active');
+}
+
+function openEditParameterModal(id){
+  const p=(allParamsCache||[]).find(x=>String(x.id)===String(id));
+  if(!p) return;
+  $('#paramModalTitle').text('Edit Parameter');
+  $('#paramId').val(p.id);
+  $('#paramName').val(p.name).trigger('input'); // dup check
+  $('#paramDescription').val(p.description||'');
+  $('#paramInputType').val(p.input_type).trigger('change');
+  if(p.input_type==='select'){
+    $('#allowedValuesField').show();
+    $('#paramAllowedValues').val(p.allowed_values||'');
+  } else {
+    $('#allowedValuesField').hide();
+    $('#paramAllowedValues').val('');
+  }
+  $('#paramDefaultValue').val(p.default_value||'');
+  $('#deleteParameterBtn').show();
+  $('#addParameterModal').addClass('is-active');
+}
+
+function saveParameter(){
+  const payload={
+    name: ($('#paramName').val()||'').trim(),
+    description: ($('#paramDescription').val()||'').trim(),
+    input_type: $('#paramInputType').val(),
+    allowed_values: $('#paramInputType').val()==='select' ? ($('#paramAllowedValues').val()||'').trim() : '',
+    default_value: ($('#paramDefaultValue').val()||'').trim()
+  };
+  if(!payload.name){ alert('Parameter name is required'); return; }
+
+  const id=$('#paramId').val();
+  const url=id? `/api/parameter/${id}/` : '/api/parameters/';
+  $.ajax({
+    url, method:'POST', contentType:'application/json', data:JSON.stringify(payload),
+    success:function(resp){
+      if(resp.success){
+        closeAddParameterModal();
+        loadParameters();      // refresh table & cache
+        refreshParamCache();   // refresh for duplicate check
+      } else {
+        alert('Could not save parameter');
+      }
+    }
+  });
+}
+
+function confirmDeleteParameter(paramId){
+  // prevent deletion if in use: check variables (M2M) and function_code mentions
+  $.get('/api/variables/', function(d){
+    if(!d.success){ return; }
+    const vars=d.variables || [];
+    const p = (allParamsCache||[]).find(x=>String(x.id)===String(paramId));
+    const used = vars.some(v => (v.parameters||[]).includes(paramId));
+    const mentioned = p ? vars.some(v => (v.function_code||'').toLowerCase().includes(p.name.toLowerCase())) : false;
+
+    if(used || mentioned){
+      const reason = used ? 'This parameter is attached to one or more variables.' :
+                            'This parameter name is referenced in a variable function.';
+      alert('Cannot delete. ' + reason);
+      return;
+    }
+    if(confirm('Delete this parameter?')){
+      $.ajax({
+        url:`/api/parameter/${paramId}/`, method:'DELETE',
+        success:function(resp){
+          if(resp.success){
+            loadParameters();
+            refreshParamCache();
+          }
+        }
+      });
+    }
+  });
+}
+
+function closeAddParameterModal(){ $('#addParameterModal').removeClass('is-active'); }
+
+// ---------- Category ----------
+function closeAddCategoryModal(){ $('#addCategoryModal').removeClass('is-active'); $('#newCategoryName').val(''); }
+function saveNewCategory(){
+  const name=($('#newCategoryName').val()||'').trim();
+  if(!name){ alert('Please enter a category name.'); return; }
+  $.ajax({
+    url:'/api/categories/', method:'POST', contentType:'application/json', data:JSON.stringify({name}),
+    success:function(d){
+      if(d.success){ closeAddCategoryModal(); location.reload(); }
+      else { alert('Could not add category'); }
+    }
+  });
+}
+
+// --- Test modal wiring ---
+let testLookupsLoaded = false;
+
+function openTestModal(){
+  if(!testLookupsLoaded){ loadTestLookups(); }
+  $('#tFlash').addClass('is-hidden').find('.message-body').empty();
+  $('#testModal').addClass('is-active');
+}
+function closeTestModal(){ $('#testModal').removeClass('is-active'); }
+
+function loadTestLookups(){
+  // Algos (from dashboard API)
+  $.get('/api/dashboard/algos/', function(d){
+    const opts = (d.algos||[]).map(a => `<option value="${a.algo_id}">${a.algo_name}</option>`).join('');
+    $('#tAlgo').html(opts);
+  });
+
+  // Accounts
+  $.get('/api/env/accounts/', function(d){
+    const base = '<option value="">(let env pick)</option>';
+    const opts = (d.accounts||[]).map(a => `<option value="${a.id}">${a.label} (${a.broker_name})</option>`).join('');
+    $('#tAccount').html(base + opts);
+  });
+
+  testLookupsLoaded = true;
+}
+
+// Replaces the old testCode() to use env-aware API
+function testCode(){
+  const code = aceEditor ? aceEditor.getValue() : ($('#codePreview').text() || '');
+  if(!code.trim()){
+    flashTest('No function code to test.', true);
+    return;
+  }
+  const algo_id = Number($('#tAlgo').val());
+if (!algo_id) { flashTest('Pick an Algo context first.', true); return; }
+
+  const mode = $('#tMode').val();
+  const account_id_raw = $('#tAccount').val(); // "" or a numeric string
+  const account_id = account_id_raw ? Number(account_id_raw) : null;
+  const use_live = $('#tUseLive').is(':checked');
+  const symbol = ($('#tSymbol').val() || 'NIFTY').trim();
+  const timeframe = ($('#tTimeframe').val() || '5m').trim();
+  const lookback = Number($('#tLookback').val() || 120);
+
+  const payload = {
+    function_code: code,
+    algo_id, mode, use_live, symbol, timeframe, lookback
+  };
+  if (account_id) payload.account_id = account_id;
+
+  const rawInputs = ($('#tInputs').val() || '').trim();
+  if (rawInputs){
+    try { payload.inputs = JSON.parse(rawInputs); }
+    catch(e){
+      flashTest('Inputs must be valid JSON', true);
+      return;
+    }
+  }
+
+  flashTest('Running…');
+
+  $.ajax({
+    url: '/api/test_function_code/',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify(payload)
+  }).done(function(d){
+    if(d && d.success){
+      flashTest(`<strong>Success</strong><br><pre style="white-space:pre-wrap">${escapeHtml(JSON.stringify(d.result, null, 2))}</pre>`);
+    }else{
+      flashTest(d.error || 'Failed', true);
+    }
+  }).fail(function(xhr){
+    const msg = (xhr.responseJSON && xhr.responseJSON.error) || xhr.statusText || 'Request failed';
+    flashTest(msg, true);
+  });
+}
+
+function runVariableTest(){ testCode(); }
+
+function flashTest(msg, isErr){
+  const box = $('#tFlash');
+  box.removeClass('is-hidden').toggleClass('is-danger', !!isErr).toggleClass('is-info', !isErr);
+  box.find('.message-body').html(msg);
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+
+
+
+
+// ---------- Caches for duplicates ----------
+function refreshParamCache(){
+  $.get('/api/parameters/', function(d){ if(d.success){ allParamsCache=d.parameters||[]; }});
+}
+function refreshVarCache(){
+  $.get('/api/variables/', function(d){ if(d.success){ allVarsCache=d.variables||[]; }});
+}
+</script>
+
+</body>
+</html>
+{% endblock %}

@@ -42,18 +42,14 @@ Created on Tue Aug  5 23:18:49 2025
 
 <body>
 
-{{ legs_json|json_script:"legs-data" }}
-{{ user_vars_json|json_script:"user-vars-data" }}
 
 <section class="section">
   <div class="container">
-    <h1 class="title">{% if is_edit_mode %}Edit Algorithm: {{ algo.algo_name }}{% else %}Add New Algorithm{% endif %}</h1>
+    <h1 class="title">Add New Algorithm</h1>
 
     
-<form id="algoForm" method="post" action="{% if is_edit_mode %}{% url 'edit_algo' algo.id %}{% else %}{% url 'add_algo' %}{% endif %}">
-
-  {% csrf_token %}
-
+<form id="algoForm" method="post" action="{% url 'add_algo' %}">
+{% csrf_token %}
   <!-- SECTION 1 -->
   <div id="basicDetailsSection">
     <div class="field">
@@ -205,11 +201,6 @@ window.instruments  = {{ instruments_json|safe }};
 window.indicators   = {{ indicators_json|safe }};
 window.all_symbols  = {{ symbol_list_json|safe }};
 
-// 2) Expose the edit‐mode flag
-window.isEditMode   = {{ is_edit_mode|yesno:"true,false" }};
-
-  // Only run this in “add” mode:
-  {% if not editing %}
   document.getElementById("AlgoName").addEventListener("input", function validateName() {
     const name = this.value.trim();
     fetch(`/check_algo_name/?name=${encodeURIComponent(name)}`)
@@ -226,11 +217,8 @@ window.isEditMode   = {{ is_edit_mode|yesno:"true,false" }};
         }
       });
   });
-  {% endif %}
 
 </script>
-
-<script src="{% static 'js/utils.js' %}"></script>
 
 <script src="{% static 'js/utils.js' %}"></script>
 <script src="{% static 'js/expression.js' %}"></script>

@@ -331,7 +331,7 @@ function extractConditions(container) {
   rows.forEach(row => {
     const variable = row.querySelector('.condition-variable')?.value;
     const operator = row.querySelector('.condition-operator')?.value;
-    const connector = row.querySelector('.group-connector')?.value || 'AND';
+    const connector = row.closest('.nested-condition')?.querySelector('.group-connector')?.value || 'AND';
 
     // LHS Parameters
     const paramDiv = row.querySelector('.condition-parameters');
@@ -370,12 +370,21 @@ function extractConditions(container) {
       children: []
     };
 
-    const subgroup = row.querySelector('.nested-condition');
-    if (subgroup) {
-      cond.children = extractConditions(subgroup);
-    }
+    // Try to find all nested condition containers directly under this row
+    const subgroups = row.querySelectorAll(':scope > .nested-condition > .conditions');
+    subgroups.forEach(subContainer => {
+      cond.children.push(...extractConditions(subContainer));
+    });
+
+    // (Fallback: If only a single nested condition per row, keep your original logic)
+    // const subContainer = row.querySelector('.nested-condition .conditions');
+    // if (subContainer) {
+    //   cond.children = extractConditions(subContainer);
+    // }
 
     conditions.push(cond);
+    // Log what is being extracted for debugging
+    console.log("Extracted condition:", cond);
   });
 
   return conditions;
@@ -430,8 +439,150 @@ function removeRootCondition(containerId, deleteBtn) {
     parent.appendChild(newBtn);
   }
 }
-
 function restoreConditionTree(containerId, conditions) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    console.error("restoreConditionTree: no container for", containerId);
+    return;
+  }
+
+  // Determine where .condition-row elements live
+  const rowsContainer = container.classList.contains('conditions')
+    ? container
+    : (container.querySelector('.conditions') || container);
+
+  // Remove any pre-existing rows
+  Array.from(rowsContainer.querySelectorAll('.condition-row'))
+    .forEach(r => r.remove());
+
+  // “Open” the root condition group if needed
+  const rootBtn = container.querySelector('button[data-root-btn]');
+  if (rootBtn) rootBtn.click();
+
+  // Rebuild each condition
+  conditions.forEach((cond, idx) => {
+    console.log(`restore condition[${idx}] in ${containerId}`, cond);
+
+    // 1) Add a new row into this container
+    addConditionRow(rowsContainer.id);
+    const row = rowsContainer.querySelector('.condition-row:last-of-type');
+    if (!row) {
+      console.error("Could not create row for", cond);
+      return;
+    }
+
+    // ─── LHS: variable + parameters ───────────────────────────────────────────
+    const lhsSel = row.querySelector('.condition-variable');
+    if (lhsSel) {
+      // Select the variable via Select2 (or fallback)
+      if (typeof $ !== 'undefined' && $(lhsSel).select2) {
+        $(lhsSel).val(cond.lhs.name || '').trigger('change.select2');
+      } else {
+        lhsSel.value = cond.lhs.name || '';
+      }
+
+      // Render its parameter inputs
+      renderConditionVariableParams(lhsSel);
+
+      // Populate the symbol parameter first
+      const symSel = row.querySelector('.condition-parameters .symbol-dropdown');
+      const symVal = cond.lhs.parameters.symbol;
+      if (symSel && symVal) {
+        initSelect2(`#${symSel.id}`, "Select symbol");
+        if (![...symSel.options].some(o => o.value === symVal)) {
+          symSel.add(new Option(symVal, symVal, true, true));
+        }
+        $(symSel).trigger('change');
+      }
+
+      // Populate any other LHS params
+      Object.entries(cond.lhs.parameters || {}).forEach(([k, v]) => {
+        if (k === 'symbol') return;
+        const inp = row.querySelector(`.condition-parameters [name$="${k}"]`);
+        if (inp) inp.value = v;
+      });
+    } else {
+      console.warn("No LHS variable dropdown in row", idx);
+    }
+
+    // ─── Operator ─────────────────────────────────────────────────────────────
+    const opSel = row.querySelector('.condition-operator');
+    if (opSel) opSel.value = cond.operator;
+
+    // ─── Connector ────────────────────────────────────────────────────────────
+    const grpWrap = row.closest('.nested-condition');
+    if (grpWrap) {
+      const connSel = grpWrap.querySelector('.group-connector');
+      if (connSel) connSel.value = cond.connector;
+    }
+
+    // ─── RHS: value vs variable ────────────────────────────────────────────────
+    const rhsModeSel = row.querySelector('.rhs-mode');
+    if (rhsModeSel) {
+      rhsModeSel.value = cond.rhs.type || 'value';
+      rhsModeSel.dispatchEvent(new Event('change', { bubbles: true }));
+
+      if (cond.rhs.type === 'value') {
+        const valInp = row.querySelector('.condition-value');
+        if (valInp) valInp.value = cond.rhs.value;
+      } else {
+        // Variable case
+        const varSel = row.querySelector('.rhs-variable-dropdown');
+        if (varSel) {
+          if (typeof $ !== 'undefined' && $(varSel).select2) {
+            $(varSel).val(cond.rhs.name || '').trigger('change.select2');
+          } else {
+            varSel.value = cond.rhs.name || '';
+          }
+
+          // Render its parameters
+          renderConditionVariableParams(varSel);
+
+          // Populate the RHS symbol param
+          const rhsSym = row.querySelector('.rhs-input .symbol-dropdown');
+          const rhsSymVal = cond.rhs.parameters.symbol;
+          if (rhsSym && rhsSymVal) {
+            initSelect2(`#${rhsSym.id}`, "Select symbol");
+            if (![...rhsSym.options].some(o => o.value === rhsSymVal)) {
+              rhsSym.add(new Option(rhsSymVal, rhsSymVal, true, true));
+            }
+            $(rhsSym).trigger('change');
+          }
+
+          // Populate any other RHS params
+          Object.entries(cond.rhs.parameters || {}).forEach(([k, v]) => {
+            if (k === 'symbol') return;
+            const inp = row.querySelector(`.rhs-input [name$="${k}"]`);
+            if (inp) inp.value = v;
+          });
+        } else {
+          console.warn("No RHS variable dropdown in row", idx);
+        }
+      }
+    } else {
+      console.warn("No RHS mode selector in row", idx);
+    }
+
+    // ─── Nested Subgroups ──────────────────────────────────────────────────────
+    if (Array.isArray(cond.children) && cond.children.length) {
+      console.log(`  → ${cond.children.length} nested children for row ${idx}`);
+      const subBtn = row.querySelector('button.is-small.is-warning');
+      if (subBtn) {
+        addSubGroupToCondition(subBtn);
+        const subCont = row.querySelector('.nested-condition .conditions');
+        if (subCont) {
+          restoreConditionTree(subCont.id, cond.children);
+        } else {
+          console.warn("No sub-conditions container in row", idx);
+        }
+      } else {
+        console.warn("No subgroup button in row", idx);
+      }
+    }
+  });
+}
+
+function restoreConditionTreeOld(containerId, conditions) {
   const container = document.getElementById(containerId);
   // “Open” the root condition group if it isn’t already
   const rootBtn = container.querySelector('button[data-root-btn]');

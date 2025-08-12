@@ -99,10 +99,36 @@
     <div id="navbarMenu" class="navbar-menu is-active">
         <div class="navbar-end mr-4">
             {% if user.is_authenticated %}
-
+            <a class="navbar-item has-text-white" href="{% url 'dashboard' %}">Dashboard</a>
                 <a class="navbar-item has-text-white" href="{% url 'add_broker' %}">Add Broker</a>
                 <a class="navbar-item has-text-white" href="{% url 'add_algo' %}">Add Algo</a>
                 <a class="navbar-item has-text-white" href="{% url 'algo_list' %}">Algo List</a>
+                                               <div class="navbar-item has-dropdown is-hoverable is-right">
+                                                   <a class="navbar-link user-dropdown-trigger">
+                                                       <span class="icon is-small"><i class="fas fa-user"></i></span>
+                                                       {{ user.name|default:user.username }}
+                                                   </a>
+                                                   
+                                               <nav class="navbar" role="navigation" aria-label="main navigation">
+                 
+
+                                                   <div class="navbar-dropdown is-right is-boxed">
+                                                       <a class="navbar-item user-dropdown-item" href="{% url 'profile' %}">
+                                                           <i class="fas fa-id-badge mr-2"></i> Profile
+                                                       </a>
+                                                       <hr class="navbar-divider">
+                                                       <a class="navbar-item user-dropdown-item" href="{% url 'logout' %}">
+                                                           <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                                                       </a>
+                                                       <hr class="navbar-divider">
+                                                       <a class="navbar-item" href="{% url 'variable_parameters' %}">
+                                                         ⚙️ Variable Management
+                                                         <a class="navbar-item" href="{% url 'environment' %}">
+                                                           ⚙️ Environment Management
+                                                         
+                                                       </a>
+                                                   </div>
+                                               </div>
 
                 {% if user.is_staff %}
                 <form method="POST" action="{% url 'insert_instruments' %}" style="display:inline;">
@@ -110,24 +136,9 @@
                     <button class="navbar-item button is-small is-warning" style="margin-left: 10px;">
                         🔄 Sync Instruments
                     </button>
+                    
                 </form>
-                                <div class="navbar-item has-dropdown is-hoverable is-right">
-                                    <a class="navbar-link user-dropdown-trigger">
-                                        <span class="icon is-small"><i class="fas fa-user"></i></span>
-                                        {{ user.name|default:user.username }}
-                                    </a>
-
-                                    <div class="navbar-dropdown is-right is-boxed">
-                                        <a class="navbar-item user-dropdown-item" href="{% url 'profile' %}">
-                                            <i class="fas fa-id-badge mr-2"></i> Profile
-                                        </a>
-                                        <hr class="navbar-divider">
-                                        <a class="navbar-item user-dropdown-item" href="{% url 'logout' %}">
-                                            <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                                        </a>
-                                    </div>
-                                </div>
-
+ 
                 {% endif %}
                 
             {% else %}

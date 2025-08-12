@@ -1,109 +1,248 @@
-{% extends "core/base.html" %}
-{% load custom_filters %}  {# Ensure this includes get_attr filter #}
-{% load widget_tweaks %}
-{% block title %}Edit Algorithm | Kuber{% endblock %}
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Aug  7 17:55:22 2025
+
+@author: Home
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Aug  5 23:18:49 2025
+
+@author: Home
+"""
+
+<!-- Simplified add_algo.html Template with Single Flat Condition Structure -->
+{% extends 'core/base.html' %}
+{% load static %}
 
 {% block content %}
-<h1 class="title is-4">Edit Algorithm: {{ algo.algo_name }}</h1>
 
-<form method="POST" action="{% url 'edit_algo' algo.id %}">
-  {% csrf_token %}
 
-  <!-- Render Algo Metadata -->
-  <div class="field">
-    <label class="label">Algorithm Name</label>
-    <div class="control">
-      {{ form.algo_name|add_class:"input" }}
-    </div>
-  </div>
 
-  <div class="field">
-    <label class="label">Minimum Fund Required</label>
-    <div class="control">
-      {{ form.minimum_fund_reqd|add_class:"input" }}
-    </div>
-  </div>
 
-  <div class="field">
-    <label class="label">Description</label>
-    <div class="control">
-      {{ form.algo_description|add_class:"textarea" }}
-    </div>
-  </div>
+ <html lang="en">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Add Algo{% endblock %}</title>
 
-  <hr>
-  <h2 class="title is-5">Logic Legs</h2>
-  <div id="logic-rows">
-    {% for logic in logic_entries %}
-      <div class="box logic-row">
-        <input type="hidden" name="logic_id[]" value="{{ logic.id }}">
+  <!-- Bulma CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
 
-        {% for field in field_names %}
-          <div class="field">
-            <label class="label">{{ field|cut:"_"|title }}</label>
-            <div class="control">
-              {% if field == "entry_condition" or field == "exit_condition" %}
-                <textarea class="textarea" name="{{ field }}[]">{{ logic|get_attr:field }}</textarea>
+  <!-- Select2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
-              {% elif field == "option_type" %}
-                <div class="select is-fullwidth">
-                  <select name="option_type[]">
-                    {% for opt in "Call,Put"|cut:"," %}
-                      <option value="{{ opt }}" {% if logic|get_attr:field == opt %}selected{% endif %}>{{ opt }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
+  <!-- Optional Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-              {% elif field == "order_type" %}
-                <div class="select is-fullwidth">
-                  <select name="order_type[]">
-                    {% for opt in "Market,Limit"|cut:"," %}
-                      <option value="{{ opt }}" {% if logic|get_attr:field == opt %}selected{% endif %}>{{ opt }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
+  <!-- Your custom styles -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
 
-              {% else %}
-                <input class="input is-small" type="text" name="{{ field }}[]" value="{{ logic|get_attr:field }}">
-              {% endif %}
+  <!-- jQuery (Only Once) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- jQuery UI (for drag/drop) -->
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+  <!-- Select2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<body>
+
+<section class="section">
+  <div class="container">
+    <h1 class="title">Add New Algorithm</h1>
+
+    
+        <form id="algoForm" method="post" action="{% url 'edit_algo' algo.id %}">
+        
+          {% csrf_token %}
+        
+          <!-- SECTION 1 -->
+          <div id="basicDetailsSection">
+            <div class="field">
+              <label class="label">Algorithm Name <span class="has-text-danger">*</span></label>
+              <input class="input" type="text" name="AlgoName" id="AlgoName"
+               value="{{ algo.algo_name}}" required>
+              <p class="help is-danger" id="algoNameError" style="display: none;">Algorithm name is required.</p>
+            </div>
+        
+            <div class="field">
+              <label class="label">Minimum Fund Required <span class="has-text-danger">*</span></label>
+              <input class="input" type="number" name="Minimum_Fund_Reqd" id="MinimumFund"
+               value="{{ algo.minimum_fund_reqd}}" required>
+              <p class="help is-danger" id="fundError" style="display: none;">Minimum fund is required.</p>
+            </div>
+        
+            <div class="field">
+              <label class="label">Description</label>
+              <textarea class="textarea" name="Algo_description" id="Algo_description">{{ algo.algo_description}}</textarea>
             </div>
           </div>
-        {% endfor %}
-        <button type="button" class="button is-danger is-small mt-2" onclick="removeLogicRow(this)">Remove leg</button>
-      </div>
-    {% empty %}
-      <p>No existing logic legs.</p>
-    {% endfor %}
-  </div>
+        
+          <!-- SECTION 2: Initially Hidden but visible when edited -->
+          <div id="strategySection" style="display: block;">
+            <hr>
+         <!-- User-Defined Variables -->
+            <div class="field">
+              <label class="label">User-Defined Variables</label>
+              <div id="userConstantsContainer"></div>
+              <button type="button" class="button is-small is-info mt-2" onclick="addUserDefinedVariable()">➕ Add Variable</button>
+            </div>
+        
+            <hr>
+            <div id="legsContainer"></div>
+        
+            <div class="field mt-4">
+              <button type="button" class="button is-primary" onclick="addLeg()">➕ Add Leg</button>
+            </div>
+        
+            <div class="field mt-4">
+              <button type="button" class="button is-info" onclick="showPreview()">👁️ Preview</button>
+              <button type="submit" class="button is-success ml-2">✅ Update Algorithm</button>
+            </div>
+          </div>
+        </form>
+    </div>
+</section>
+<p id="const_preview_${index}" class="is-size-7 has-text-grey mt-1 ml-1"></p>
 
-  <button type="button" class="button is-link is-light mt-3" onclick="addLogicRow()">➕ Add New Leg</button>
+<div class="box mt-5" id="jsonPreviewBox" style="display:none">
+  <h2 class="subtitle">🧾 JSON Preview</h2>
+  <pre><code id="jsonPreview"></code></pre>
+  <h2 class="subtitle mt-3">🐍 Python Preview</h2>
+  <pre><code id="pythonPreview"></code></pre>
+</div>
+<style>
+  .nested-condition {
+    border-left: 2px solid #7a7a7a;
+    margin-left: 1rem;
+    padding-left: 1rem;
+    position: relative;
+  }
+  .nested-condition::before {
+    content: "";
+    position: absolute;
+    left: -1.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.4rem;
+    height: 2px;
+    background-color: #7a7a7a;
+  }
+  .condition-row {
+    position: relative;
+    margin-left: 1.5rem;
+  }
+  .condition-row::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -1.4rem;
+    transform: translateY(-50%);
+    width: 1.2rem;
+    height: 1px;
+    background-color: #9999ff;
+  }
+  
+   .constant-item .handle::before {
+    content: '\2630'; /* ☰ */
+    margin-right: 5px;
+    cursor: move;
+    color: #777;
+  }
 
-  <div class="field mt-5">
-    <button type="submit" class="button is-primary">Save All Changes</button>
-    <a class="button is-light" href="{% url 'algo_list' %}">Cancel</a>
+    .select2-container {
+      min-width: 100%;
+      width: 100% !important;
+    }
+    #userConstantsContainer .expression_builder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.condition-row.highlight-red {
+  border: 2px dashed red;
+  background-color: #fff0f0;
+}
+
+
+#userConstantsContainer .is-size-7 {
+  font-style: italic;
+  background-color: #f4f4f4;
+  padding: 0.25rem 0.5rem;
+  border-left: 3px solid #00c4a7;
+}
+
+#userConstantsContainer .field,
+#userConstantsContainer .expression_builder,
+#userConstantsContainer .buttons {
+  transition: all 0.3s ease;
+}
+
+</style>
+
+<div class="modal" id="varInUseModal">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Cannot Delete Variable</p>
+      <button class="delete" aria-label="close" onclick="closeVarInUseModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <p class="has-text-danger">❌ This variable is currently being used in one or more condition rows.</p>
+      <p>Please remove it from those rows before deleting.</p>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button" onclick="closeVarInUseModal()">OK</button>
+    </footer>
   </div>
-</form>
+</div>
+
+{{ instruments_json|json_script:"instruments-data" }}
+{{ indicators_json|json_script:"indicators-data" }}
+{{ symbol_list_json|json_script:"symbols-data" }}
+{{ user_vars_json|json_script:"user-vars-data" }}
+{{ legs_json|json_script:"legs-data" }}
 
 <script>
-function emptyRowHtml() {
-  return `
-    <div class="box logic-row">
-      <input type="hidden" name="logic_id[]" value="">
-      <div class="field"><label class="label">Instrument Name</label><div class="control"><input class="input is-small" type="text" name="instrument_name[]" required></div></div>
-      <div class="field"><label class="label">Expiry Date</label><div class="control"><input class="input is-small" type="text" name="expiry_date[]" required></div></div>
-      <div class="field"><label class="label">Strike Price</label><div class="control"><input class="input is-small" type="text" name="strike_price[]" required></div></div>
-      <div class="field"><label class="label">Option Type</label><div class="control"><div class="select is-fullwidth"><select name="option_type[]"><option value="Call">Call</option><option value="Put">Put</option></select></div></div></div>
-      <div class="field"><label class="label">Order Type</label><div class="control"><div class="select is-fullwidth"><select name="order_type[]"><option value="Market">Market</option><option value="Limit">Limit</option></select></div></div></div>
-      <div class="field"><label class="label">Entry Condition</label><div class="control"><textarea class="textarea" name="entry_condition[]"></textarea></div></div>
-      <div class="field"><label class="label">Exit Condition</label><div class="control"><textarea class="textarea" name="exit_condition[]"></textarea></div></div>
-      <button type="button" class="button is-danger is-small mt-2" onclick="removeLogicRow(this)">Remove leg</button>
-    </div>`;
-}
-function addLogicRow() {
-  document.getElementById('logic-rows').insertAdjacentHTML('beforeend', emptyRowHtml());
-}
-function removeLogicRow(btn) {
-  btn.closest('.logic-row').remove();
-}
+// 1) Expose the raw JSON directly to JS variables (no parsing needed in utils.js)
+ window.instruments          = {{ instruments_json|safe }};
+  window.indicators           = {{ indicators_json|safe }};
+  window.all_symbols          = {{ symbol_list_json|safe }};
+  window.userDefinedVariables = {{ user_vars_json|safe }};
+  window.legs                 = {{ legs_json|safe }};
+  window.isEditMode           = true;
+
+// 2) Expose the edit‐mode flag
+window.isEditMode   = {{ is_edit_mode|yesno:"true,false" }};
+
+
+  document.getElementById("AlgoName").addEventListener("input", function validateName() {
+    const name = this.value.trim();
+    fetch(`/check_algo_name/?name=${encodeURIComponent(name)}`)
+      .then(r=>r.json())
+      .then(data=>{
+        const fb = document.getElementById("algoNameError");
+        const btn = document.getElementById("defineStrategyBtn");
+        if (data.valid) {
+          fb.style.display="none"; this.classList.remove("is-danger");
+          btn.disabled = !document.getElementById("MinimumFund").value.trim();
+        } else {
+          fb.textContent = data.message; fb.style.display="block";
+          this.classList.add("is-danger"); btn.disabled = true;
+        }
+      });
+  });
+
 </script>
+
+<script src="{% static 'js/utils.js' %}"></script>
+<script src="{% static 'js/expression.js' %}"></script>
+<script src="{% static 'js/condition.js' %}"></script>
+<script src="{% static 'js/preview.js' %}"></script>
+<script src="{% static 'js/init.js' %}"></script>
+
 {% endblock %}

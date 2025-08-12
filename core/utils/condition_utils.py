@@ -20,25 +20,34 @@ def serialize_conditions1(root_conditions):
     return [recurse(c) for c in root_conditions]
 
 def serialize_conditions(logic, condition_type):
-    def serialize_node(node):
-        base = {
+    def serialize_node(node, is_root=False):
+        data = {
+            "is_root":  is_root,
             "lhs": {
-                "name": node.lhs_variable,
-                "parameters": [{"key": k, "value": v} for k, v in node.lhs_parameters.items()]
+                "name":       node.lhs_variable,
+                "parameters": node.lhs_parameters or {}
             },
-            "operator": node.operator,
+            "operator":    node.operator,
             "rhs": {
-                "type": node.rhs_type,
-                "value": node.rhs_value if node.rhs_type == "value" else None,
-                "name": node.rhs_variable if node.rhs_type == "variable" else None,
-                "parameters": [{"key": k, "value": v} for k, v in node.rhs_parameters.items()] if node.rhs_type == "variable" else []
+                "type":       node.rhs_type,
+                "value":      node.rhs_value    if node.rhs_type == "value"    else None,
+                "name":       node.rhs_variable if node.rhs_type == "variable" else None,
+                "parameters": node.rhs_parameters or {}
             },
-            "connector": node.connector,
-            "children": []
+            "connector":   node.connector,
+            "children":    []
         }
-        children = node.children.all()
-        base["children"] = [serialize_node(child) for child in children]
-        return base
+        # Recurse into any nested children, marking them non‐root
+        for child in node.children.all():
+            data["children"].append(serialize_node(child, is_root=False))
+        return data
 
-    top_level = Condition.objects.filter(algo_logic=logic, condition_type=condition_type, nested_condition__isnull=True)
-    return [serialize_node(c) for c in top_level]
+    # Fetch only the top‐level (no parent) conditions
+    top_level = Condition.objects.filter(
+        algo_logic=logic,
+        condition_type=condition_type,
+        nested_condition__isnull=True
+    )
+
+    # Serialize each, marking it as root
+    return [serialize_node(node, is_root=True) for node in top_level]

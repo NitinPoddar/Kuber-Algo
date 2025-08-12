@@ -1,3 +1,33 @@
+form.addEventListener("submit", function(e) {
+  const legs = document.querySelectorAll('.leg-block');
+  legs.forEach((leg, idx) => {
+    const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
+    const exit = extractConditions(document.getElementById(`exit_conditions_${idx}`));
+    const entryInput = document.createElement('input');
+    entryInput.type = 'hidden';
+    entryInput.name = `entry_conditions_json_${idx}`;
+    entryInput.value = JSON.stringify(entry);
+    form.appendChild(entryInput);
+    const exitInput = document.createElement('input');
+    exitInput.type = 'hidden';
+    exitInput.name = `exit_conditions_json_${idx}`;
+    exitInput.value = JSON.stringify(exit);
+    form.appendChild(exitInput);
+  });
+});
+$(function () {
+  $(document).on('mouseenter', '.constant-builder', function () {
+    $(this).sortable({
+      axis: 'x',
+      items: '> .constant-item',
+      handle: '.handle',
+      placeholder: 'drag-placeholder',
+      tolerance: 'pointer'
+    });
+  });
+});
+
+
 document.addEventListener("DOMContentLoaded", function () {
   const algoNameInput = document.getElementById("AlgoName");
   const fundInput = document.getElementById("MinimumFund");
@@ -28,59 +58,37 @@ document.addEventListener("DOMContentLoaded", function () {
   fundInput.addEventListener("input", validateFields);
 
   if (window.isEditMode) {
-  // 1. Show strategy section immediately
-  document.getElementById("strategySection").style.display = "block";
-  document.getElementById("defineStrategyBtn").style.display = "none";
+    const legs = Array.isArray(window.legs) ? window.legs : [];
 
-  // 2. Pre-fill top fields
-  //algoNameInput.value = "{{ algo.algo_name|escapejs }}";
-  //fundInput.value = "{{ algo.minimum_fund_reqd|default:'' }}";
-  //document.querySelector("textarea[name='Algo_description']").value = `{{ algo.algo_description|escapejs }}`;
-  defineBtn.disabled = false;
+      legs.forEach((leg, idx) => {
+        addLeg();
+        const legBlock = document.querySelectorAll('.leg-block')[idx];
+        const select = legBlock.querySelector(`.instrument-dropdown`);
+    
+        // Set instrument
+        $(select).val(leg.instrument_name).trigger('change');
+    
+        setTimeout(() => {
+          // Set expiry and strike
+          document.getElementById(`expiry_${idx}`).value = leg.expiry_date || '';
+          document.getElementById(`strike_${idx}`).value = leg.strike_price || '';
+    
+          // Set other dropdowns
+          legBlock.querySelector(`select[name='option_type[]']`).value = leg.option_type;
+          legBlock.querySelector(`select[name='order_direction[]']`).value = leg.order_direction;
+          legBlock.querySelector(`select[name='order_type[]']`).value = leg.order_type;
 
-  // 3. Load user-defined variables (already available globally)
-  preloadUserDefinedVariables();
+          // Add and restore conditions
+          addRootCondition(`entry_conditions_${idx}`, legBlock.querySelector(`#entry_conditions_${idx} + button`));
+          restoreConditionTree(`entry_conditions_${idx}`, leg.entry_conditions);
+    
+          addRootCondition(`exit_conditions_${idx}`, legBlock.querySelector(`#exit_conditions_${idx} + button`));
+          restoreConditionTree(`exit_conditions_${idx}`, leg.exit_conditions);
+        }, 300); // delay ensures DOM is ready
+      });
+    
+      }
 
-  // 4. Load legs from parsed JSON
-  let legs = [];
-  const legsEl = document.getElementById("legs-data");
-  if (legsEl) {
-    try {
-      legs = JSON.parse(legsEl.textContent);
-    } catch (e) {
-      console.error("❌ Error parsing legs-data:", e);
-    }
-  }
-
-  // 5. Add legs and populate
-  legs.forEach((leg, idx) => {
-    addLeg();
-    const legBlock = document.querySelectorAll('.leg-block')[idx];
-    const select = legBlock.querySelector(`.instrument-dropdown`);
-
-    // Set instrument
-    $(select).val(leg.instrument_name).trigger('change');
-
-    setTimeout(() => {
-      // Set expiry and strike
-      document.getElementById(`expiry_${idx}`).value = leg.expiry_date || '';
-      document.getElementById(`strike_${idx}`).value = leg.strike_price || '';
-
-      // Set other dropdowns
-      legBlock.querySelector(`select[name='option_type[]']`).value = leg.option_type;
-      legBlock.querySelector(`select[name='order_direction[]']`).value = leg.order_direction;
-      legBlock.querySelector(`select[name='order_type[]']`).value = leg.order_type;
-
-      // Add and restore conditions
-      addRootCondition(`entry_conditions_${idx}`, legBlock.querySelector(`#entry_conditions_${idx} + button`));
-      restoreConditionTree(`entry_conditions_${idx}`, leg.entry_conditions);
-
-      addRootCondition(`exit_conditions_${idx}`, legBlock.querySelector(`#exit_conditions_${idx} + button`));
-      restoreConditionTree(`exit_conditions_${idx}`, leg.exit_conditions);
-    }, 300); // delay ensures DOM is ready
-  });
-
-  }
 });
 
 function initSelect2(element, placeholder = "Search...") {
@@ -139,19 +147,5 @@ function closeVarInUseModal() {
 
 document.addEventListener("DOMContentLoaded", preloadUserDefinedVariables);
 
-document.addEventListener('change', e => {
-  if (!e.target.matches('select.rhs-mode')) return;
-  const sel     = e.target;
-  const row     = sel.closest('.condition-row');
-  const textIn  = row.querySelector('input.condition-value');
-  const varDiv  = row.querySelector('div.rhs-input');
 
-  const isValue = sel.value === 'value';
-  textIn.style.display   = isValue ? ''     : 'none';
-  varDiv.style.display   = isValue ? 'none' : '';
 
-  if (!isValue) {
-    const varSel = varDiv.querySelector('select.rhs-variable-dropdown');
-    renderConditionVariableParams(varSel);
-  }
-});

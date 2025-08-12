@@ -10,7 +10,9 @@ function addUserDefinedVariable() {
       <strong>Variable Definition</strong>
       <div class="is-flex is-align-items-center">
         <span id="constant_status_${index}" class="icon is-small mr-2"></span>
-        <button id="user_variable_close_${index}" type="button" class="delete" onclick="removeUserConstant(${index})"></button>
+        <button type="button" class="delete" 
++              onclick="this.closest('.box').remove()">
++      </button>
       </div>
     </div>
 
@@ -671,53 +673,58 @@ function preloadUserDefinedVariables() {
   if (!Array.isArray(userDefinedVariables)) return;
 
   userDefinedVariables.forEach((variable, index) => {
-    const section = document.createElement("div");
-    section.className = "box";
-    section.id = `user_var_box_${index}`;
+    // 1) Create the outer box
+    const box = document.createElement("div");
+    box.className = "box mb-3";
+    box.id = `user_constant_box_${index}`;
 
-    // Build HTML for full expression UI
-    section.innerHTML = `
-      <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-        <input class="input is-small" name="user_constant_name_${index}" value="${variable.name}" placeholder="Enter variable name" />
-        <div>
-          <button type="button" class="button is-small is-warning mr-1" onclick="editUserConstant(${index})">✏️ Edit</button>
-          <button type="button" class="button is-small is-danger" onclick="removeUserConstant(${index})">❌ Delete</button>
-        </div>
-      </div>
+    // 2) Hidden input to keep the JSON for form submit & edit
+    const hiddenInput = document.createElement("input");
+    hiddenInput.type = "hidden";
+    hiddenInput.name = `user_variable_json_${index}`;
+    hiddenInput.id   = `user_constant_input_${index}`;
+    hiddenInput.value = JSON.stringify(variable);
+    box.appendChild(hiddenInput);
 
-      <div id="expression_builder_${index}" class="expression-builder mb-2"></div>
-      <div id="expr_error_box_${index}" class="notification is-danger is-light" style="display: none;"></div>
-
-      <div class="is-flex is-justify-content-space-between">
-   <span id="const_preview_${index}" class="has-text-info">${formatExpressionText(variable.expression)}</span>
-      </div>
-
-      </div>
-
-         <input type="hidden" id="user_constant_input_${index}" name="user_variable_json_${index}" />
- 
+    // 3) Summary line: "Name = expression"
+    const summaryLine = document.createElement("div");
+    summaryLine.id        = `user_constant_summary_${index}`;
+    summaryLine.className = "mt-2 p-2 has-background-light has-text-weight-semibold";
+    summaryLine.innerHTML = `
+      <span class="has-text-grey-dark">
+        ${variable.name} = ${formatExpressionText(variable.expression)}
+      </span>
     `;
+    box.appendChild(summaryLine);
 
-    container.appendChild(section);
+    // 4) Action buttons: Edit & Delete
+    const actionWrapper = document.createElement("div");
+    actionWrapper.id        = `edit_delete_controls_${index}`;
+    actionWrapper.className = "buttons mt-2";
+    actionWrapper.innerHTML = `
+      <button type="button" class="button is-small is-warning"
+              onclick="editUserConstant(${index})">✏️</button>
+      <button type="button" class="button is-small is-danger"
+              onclick="removeUserConstant(${index})">🗑️</button>
+    `;
+    box.appendChild(actionWrapper);
 
-    // Restore the expression into builder
-    loadExpressionUIFromJSON(`expression_builder_${index}`, variable.expression);
+    // 5) Append to container
+    container.appendChild(box);
 
-    // Save hidden input for form submission
-    updateUserVariableHiddenJSON(index);
-
-    // Inject into dropdowns
-    const dropdowns = document.querySelectorAll('.condition-variable, .inline-variable-dropdown');
-    dropdowns.forEach(dd => {
-      if (![...dd.options].some(o => o.value === variable.name)) {
-        const opt = document.createElement("option");
-        opt.value = variable.name;
-        opt.textContent = variable.name;
-        dd.appendChild(opt);
-      }
-    });
+    // 6) Make this variable available in all condition dropdowns
+    document.querySelectorAll('.condition-variable, .inline-variable-dropdown')
+      .forEach(dd => {
+        if (![...dd.options].some(o => o.value === variable.name)) {
+          const opt = document.createElement("option");
+          opt.value   = variable.name;
+          opt.textContent = variable.name;
+          dd.appendChild(opt);
+        }
+      });
   });
 }
+
 
 function updateUserVariableHiddenJSON(index) {
   const container = document.getElementById(`expression_builder_${index}`);

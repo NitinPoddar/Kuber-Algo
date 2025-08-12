@@ -1,0 +1,283 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="is-flex is-justify-content-space-between is-align-items-center">
+      <h1 class="title">Your Algorithms</h1>
+      <div>
+        <div class="select is-small">
+          <select id="statusFilter">
+            <option value="">All</option>
+            <option value="unregistered">Unregistered</option>
+            <option value="paper_ready">Paper Ready</option>
+            <option value="live_ready">Live Ready</option>
+            <option value="running">Running</option>
+            <option value="paused">Paused</option>
+            <option value="error">Error</option>
+          </select>
+        </div>
+        <button class="button is-small ml-2" id="reloadBtn">Reload</button>
+      </div>
+    </div>
+
+    <div id="algoGrid" class="columns is-multiline"></div>
+  </div>
+</section>
+
+<!-- Register/Link Modal -->
+<div class="modal" id="registerModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:520px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Register / Link Account</p>
+      <button class="delete" aria-label="close" onclick="closeRegModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="regAlgoId">
+      <div class="field">
+        <label class="label">Choose Account</label>
+        <div class="select is-fullwidth">
+          <select id="regAccount"></select>
+        </div>
+        <p class="help">
+  <a href="{% url 'broker-account-create' %}?next={{ request.path|urlencode }}" target="_blank">Add a broker account</a>
+  · <a href="#" id="reloadAccounts">Reload list</a>
+</p>
+      </div>
+      <div class="field">
+        <label class="label">Role</label>
+        <div class="select is-fullwidth">
+          <select id="regRole">
+            <option value="primary">Primary (Live)</option>
+            <option value="hedge">Hedge (Live)</option>
+            <option value="paper">Paper</option>
+          </select>
+        </div>
+      </div>
+      <label class="checkbox"><input type="checkbox" id="regDefault"> Set as default (ignored for paper)</label>
+      <p class="help is-danger mt-2" id="regErr" style="display:none;"></p>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" onclick="submitRegister()">Save</button>
+        <button class="button" onclick="closeRegModal()">Cancel</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<style>
+.card-status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
+.kpi-chip{display:inline-block;padding:2px 8px;border-radius:999px;background:#f5f5f5;margin-right:6px}
+.logbox{max-height:160px;overflow:auto;background:#fafafa;border:1px solid #eee;border-radius:6px;padding:8px}
+.logline{font-size:12px;white-space:pre-wrap;margin-bottom:4px}
+.log-INFO{color:#363636} .log-WARN{color:#b58900} .log-ERROR{color:#cc0000} .log-DEBUG{color:#6a737d}
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+// ---- CSRF ----
+function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){const c=document.cookie.split(';');for(let i=0;i<c.length;i++){const ck=c[i].trim();if(ck.substring(0,name.length+1)===(name+'=')){v=decodeURIComponent(ck.substring(name.length+1));break;}}}return v}
+const csrftoken=getCookie('csrftoken');
+$.ajaxSetup({beforeSend:function(xhr,s){if(!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(s.type)){xhr.setRequestHeader("X-CSRFToken",csrftoken);}}});
+
+let cardsCache = [];
+let STATUS_STYLES = {}; // filled from API
+
+// ---- Styles (server-configurable, with fallbacks) ----
+function fetchStatusStyles(cb){
+  $.get('/api/dashboard/status_styles/', function(d){
+    if(d && d.success) STATUS_STYLES = d.styles || {};
+    if (cb) cb();
+  });
+}
+function statusBgClass(status){
+  return (STATUS_STYLES[status] && STATUS_STYLES[status].bulma_bg_class) || 'has-background-light';
+}
+function statusTagClass(status){
+  return (STATUS_STYLES[status] && STATUS_STYLES[status].bulma_tag_class) || 'is-light';
+}
+function statusDotStyle(status){
+  const hex = STATUS_STYLES[status]?.dot_hex;
+  return hex ? `style="background:${hex}"` : '';
+}
+function statusLabel(status){
+  return (STATUS_STYLES[status] && STATUS_STYLES[status].label) || status.replace('_',' ');
+}
+
+// ---- Cards render ----
+function renderCards(list){
+  const filter = $('#statusFilter').val();
+  let html='';
+  (list||[]).filter(a=>!filter || a.status===filter).forEach(a=>{
+    const bgClass = statusBgClass(a.status);
+    const tagClass = statusTagClass(a.status);
+    const dotStyle = statusDotStyle(a.status);
+    const label = statusLabel(a.status);
+
+    html += `
+      <div class="column is-one-quarter">
+        <div class="card">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="card-status-dot" ${dotStyle}></span>
+              ${a.algo_name}
+            </p>
+            <p class="card-header-icon">
+              <span class="tag ${tagClass}">${label}</span>
+            </p>
+          </header>
+
+          <div class="card-content ${bgClass}">
+            <div class="content">
+              <div class="mb-2">
+                <span class="kpi-chip">Today: <strong>${a.kpis.today_pnl}</strong></span>
+                <span class="kpi-chip">MTD: <strong>${a.kpis.mtd_pnl}</strong></span>
+                <span class="kpi-chip">Total: <strong>${a.kpis.total_pnl}</strong></span>
+              </div>
+
+              <div class="buttons are-small">
+                ${a.status==='unregistered' ? `
+                  <button class="button is-link is-light btn-register" data-algo="${a.algo_id}">Register</button>
+                  <button class="button is-info is-light btn-register-paper" data-algo="${a.algo_id}">Paper</button>
+                ` : `
+                  <button class="button is-success is-light btn-run" data-mode="live" data-algo="${a.algo_id}" ${a.has_live?'':'disabled'}>Run Live</button>
+                  <button class="button is-link is-light btn-run" data-mode="paper" data-algo="${a.algo_id}" ${a.has_paper?'':'disabled'}>Run Paper</button>
+                  <button class="button is-warning is-light btn-pause" data-algo="${a.algo_id}" ${a.status==='running'?'':'disabled'}>Pause</button>
+                  <button class="button is-danger is-light btn-stop" data-algo="${a.algo_id}">Stop</button>
+                `}
+                <button class="button is-light btn-logs" data-algo="${a.algo_id}">Logs</button>
+              </div>
+
+              <div class="mt-2 is-size-7 has-text-grey">
+                Last heartbeat: ${a.last_heartbeat || '—'}
+              </div>
+
+              <div class="logbox mt-3 is-hidden" id="logbox-${a.algo_id}">
+                <div class="is-size-7 has-text-grey mb-1">Recent logs</div>
+                <div id="logs-${a.algo_id}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  });
+  $('#algoGrid').html(html);
+}
+
+// ---- Data loads & actions ----
+function loadDashboard(){
+  $.get('/api/dashboard/algos/', function(d){
+    if(!d.success) return;
+    cardsCache = d.algos || [];
+    renderCards(cardsCache);
+  });
+}
+
+function openRegModal(algoId, role){
+  $('#regAlgoId').val(algoId);
+  $('#regRole').val(role || 'primary');
+  $('#regDefault').prop('checked', role!=='paper');
+  $('#regErr').hide().text('');
+
+  $.get('/api/env/accounts/', function(d){
+    if(!d.success) return;
+    const accounts = d.accounts || [];
+    if (accounts.length === 0) {
+      const addUrl = "{% url 'broker-account-create' %}?next={{ request.path|urlencode }}";
+      window.open(addUrl, '_blank');
+      $('#regErr').text('No broker accounts yet. Add one, then click "Reload list".').show();
+    }
+    const opts = accounts.map(a=>`<option value="${a.id}">${a.label} (${a.broker_name})</option>`).join('');
+    $('#regAccount').html(opts);
+    $('#registerModal').addClass('is-active');
+  });
+}
+
+$(function(){
+  // ...
+  $(document).on('click', '#reloadAccounts', function(e){
+    e.preventDefault();
+    $.get('/api/env/accounts/', function(d){
+      if(!d.success) return;
+      const opts = (d.accounts||[]).map(a=>`<option value="${a.id}">${a.label} (${a.broker_name})</option>`).join('');
+      $('#regAccount').html(opts);
+      $('#regErr').hide().text('');
+    });
+  });
+});
+
+function closeRegModal(){ $('#registerModal').removeClass('is-active'); }
+
+function submitRegister(){
+  const algo = $('#regAlgoId').val();
+  const payload = {
+    account_id: $('#regAccount').val(),
+    role: $('#regRole').val(),
+    is_default: $('#regDefault').is(':checked')
+  };
+  $.ajax({
+    url: `/api/dashboard/${algo}/register/`,
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify(payload)
+  }).done(d=>{
+    if(d.success){ closeRegModal(); loadDashboard(); }
+    else { $('#regErr').text(d.error||'Failed').show(); }
+  });
+}
+
+function fetchLogs(algoId, mode='paper'){
+  $.get(`/api/dashboard/${algoId}/logs/?mode=${encodeURIComponent(mode)}&limit=50`, function(d){
+    if(!d.success) return;
+    const box = $(`#logbox-${algoId}`); box.removeClass('is-hidden');
+    const ct = $(`#logs-${algoId}`); ct.empty();
+    d.logs.forEach(row=>{
+      ct.append(`<div class="logline log-${row.level}">[${row.level}] ${row.ts} — ${row.message}</div>`);
+    });
+  });
+}
+
+// ---- Wiring ----
+$(function(){
+  // load styles first, then data, then start polling
+  fetchStatusStyles(function(){
+    loadDashboard();
+    setInterval(loadDashboard, 5000);
+  });
+
+  $('#reloadBtn').on('click', loadDashboard);
+  $('#statusFilter').on('change', function(){ renderCards(cardsCache); });
+
+  $('#algoGrid').on('click', '.btn-register', function(){ openRegModal($(this).data('algo'), 'primary'); });
+  $('#algoGrid').on('click', '.btn-register-paper', function(){ openRegModal($(this).data('algo'), 'paper'); });
+  $('#algoGrid').on('click', '.btn-run', function(){
+    const algo=$(this).data('algo'), mode=$(this).data('mode');
+    $.ajax({url:`/api/dashboard/${algo}/run/`, method:'POST', contentType:'application/json',
+      data: JSON.stringify({mode})
+    }).done(loadDashboard);
+  });
+  $('#algoGrid').on('click', '.btn-pause', function(){
+    const algo=$(this).data('algo');
+    $.ajax({url:`/api/dashboard/${algo}/pause/`, method:'POST', contentType:'application/json',
+      data: JSON.stringify({mode:'live'})  // adjust if you pause paper
+    }).done(loadDashboard);
+  });
+  $('#algoGrid').on('click', '.btn-stop', function(){
+    const algo=$(this).data('algo');
+    $.ajax({url:`/api/dashboard/${algo}/stop/`, method:'POST', contentType:'application/json',
+      data: JSON.stringify({mode:'live'})
+    }).done(loadDashboard);
+  });
+  $('#algoGrid').on('click', '.btn-logs', function(){
+    const algoStr=$(this).data('algo');
+    const algo = Number(algoStr);
+    const card = cardsCache.find(x=>Number(x.algo_id)===algo);
+    const mode = (card && card.run_mode) || 'paper';
+    fetchLogs(algo, mode);
+  });
+});
+</script>
+{% endblock %}

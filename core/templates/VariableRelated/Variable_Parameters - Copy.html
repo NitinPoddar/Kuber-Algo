@@ -1,0 +1,455 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<html lang="en">
+  <meta charset="UTF-8">
+  <title>Environment</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<body>
+<section class="section">
+  <div class="container">
+    <h1 class="title">Environment</h1>
+
+    <!-- BROKER ACCOUNTS -->
+    <div class="box">
+      <div class="is-flex is-justify-content-space-between mb-3">
+        <h2 class="subtitle">Broker Accounts</h2>
+        <button class="button is-small is-info" id="addBrokerBtn">➕ Add Broker Account</button>
+      </div>
+      <div id="brokerTableArea"></div>
+    </div>
+
+    <!-- GLOBAL VARIABLES -->
+    <div class="box mt-5">
+      <div class="is-flex is-justify-content-space-between mb-3">
+        <h2 class="subtitle">Global Variables</h2>
+        <button class="button is-small is-info" id="addGlobalBtn">➕ Add Global</button>
+      </div>
+      <div class="field is-grouped mb-3">
+        <div class="control">
+          <div class="select">
+            <select id="gvScope">
+              <option value="">All</option>
+              <option value="global">Global</option>
+              <option value="algo">Per Algo</option>
+              <option value="user">My Scope</option>
+            </select>
+          </div>
+        </div>
+        <div class="control" id="algoScopeCtrl" style="display:none;">
+          <div class="select">
+            <select id="gvAlgo">
+              <option value="">Select Algo</option>
+              {% for a in algos %}
+                <option value="{{ a.id }}">{{ a.algo_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="control">
+          <button class="button" id="reloadGlobalsBtn">Reload</button>
+        </div>
+      </div>
+      <div id="globalTableArea"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Modal: Broker Account -->
+<div class="modal" id="brokerModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:520px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="brokerModalTitle">Add Broker Account</p>
+      <button class="delete" aria-label="close" onclick="closeBrokerModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="brokerAccId">
+      <div class="field">
+        <label class="label">Account Label</label>
+        <input class="input" id="brokerLabel" placeholder="e.g. Zerodha Main">
+        <p class="help is-danger" id="brokerLabelDup" style="display:none;">Label already exists.</p>
+      </div>
+      <div class="field">
+        <label class="label">Broker</label>
+        <div class="select is-fullwidth">
+          <select id="brokerSelect">
+            {% for b in brokers %}
+              <option value="{{ b.id }}">{{ b.broker_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Config (JSON)</label>
+        <textarea class="textarea" id="brokerConfig" placeholder='{"api_key":"...", "api_secret":"..."}'></textarea>
+        <p class="help">Store only non-secret or minimally required fields in dev. Encrypt in prod.</p>
+      </div>
+      <div class="field">
+        <label class="checkbox"><input type="checkbox" id="brokerActive" checked> Active</label>
+      </div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" id="saveBrokerBtn" onclick="saveBroker()">Save</button>
+        <button class="button" onclick="closeBrokerModal()">Cancel</button>
+      </div>
+      <div>
+        <button class="button is-danger is-light" id="deleteBrokerBtn" style="display:none;">Delete</button>
+        <button class="button is-link is-light" id="testBrokerBtn" style="display:none;">Test</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Modal: Global Variable -->
+<div class="modal" id="globalModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:520px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="globalModalTitle">Add Global</p>
+      <button class="delete" aria-label="close" onclick="closeGlobalModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <input type="hidden" id="gvId">
+      <div class="field">
+        <label class="label">Key</label>
+        <input class="input" id="gvKey" placeholder="e.g. atr_period">
+        <p class="help is-danger" id="gvKeyDup" style="display:none;">Duplicate key in this scope.</p>
+      </div>
+      <div class="field">
+        <label class="label">Type</label>
+        <div class="select is-fullwidth">
+          <select id="gvType">
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Scope</label>
+        <div class="select is-fullwidth">
+          <select id="gvScopeForm">
+            <option value="global">Global</option>
+            <option value="algo">Per Algo</option>
+            <option value="user">My Scope</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="gvAlgoCtrl" style="display:none;">
+        <label class="label">Algo</label>
+        <div class="select is-fullwidth">
+          <select id="gvAlgoForm">
+            {% for a in algos %}
+              <option value="{{ a.id }}">{{ a.algo_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Value</label>
+        <textarea class="textarea" id="gvValue" placeholder='If JSON: {"foo":1}'></textarea>
+      </div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <div>
+        <button class="button is-primary" id="saveGlobalBtn" onclick="saveGlobal()">Save</button>
+        <button class="button" onclick="closeGlobalModal()">Cancel</button>
+      </div>
+      <button class="button is-danger is-light" id="deleteGlobalBtn" style="display:none;">Delete</button>
+    </footer>
+  </div>
+</div>
+
+<style>
+.select2-container { width:100%!important; min-width:100%; }
+.table td, .table th { vertical-align: middle; }
+</style>
+
+<script>
+// ---- CSRF ----
+function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){const c=document.cookie.split(';');for(let i=0;i<c.length;i++){const ck=c[i].trim();if(ck.substring(0,name.length+1)===(name+'=')){v=decodeURIComponent(ck.substring(name.length+1));break;}}}return v}
+const csrftoken=getCookie('csrftoken');
+$.ajaxSetup({beforeSend:function(xhr,s){if(!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(s.type)){xhr.setRequestHeader("X-CSRFToken",csrftoken);}}});
+
+// ---- Caches for dup checks ----
+let brokerCache=[];   // [{id, account_label, ...}]
+let globalCache=[];   // [{id, key, algo, user, ...}]
+
+// ---------- Brokers ----------
+function loadBrokers(){
+  $.get('/api/env/brokers/', function(d){
+    if(!d.success) return;
+    brokerCache = d.accounts || [];
+    let html = `
+      <table class="table is-striped is-narrow is-fullwidth">
+        <thead><tr>
+          <th>Label</th><th>Broker</th><th>Status</th><th>Last Test</th><th class="has-text-right">Actions</th>
+        </tr></thead><tbody>
+    `;
+    brokerCache.forEach(a=>{
+      html += `<tr data-id="${a.id}">
+        <td>${a.account_label}</td>
+        <td>${a.broker_name}</td>
+        <td>${a.last_test_ok ? '<span class="tag is-success is-light">OK</span>' : '<span class="tag is-light">—</span>'}</td>
+        <td>${a.last_test_at || '—'}</td>
+        <td class="has-text-right">
+          <div class="buttons are-small is-right">
+            <button class="button is-link is-light editBrokerBtn">Edit</button>
+            <button class="button is-info is-light testBrokerBtn">Test</button>
+            <button class="button is-danger is-light deleteBrokerBtn">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    $('#brokerTableArea').html(html);
+  });
+}
+
+function openAddBroker(){
+  $('#brokerModalTitle').text('Add Broker Account');
+  $('#brokerAccId').val('');
+  $('#brokerLabel').val('').trigger('input');
+  $('#brokerSelect').val($('#brokerSelect option:first').val());
+  $('#brokerConfig').val('');
+  $('#brokerActive').prop('checked', true);
+  $('#deleteBrokerBtn, #testBrokerBtn').hide();
+  $('#brokerModal').addClass('is-active');
+}
+function openEditBroker(id){
+  const a = brokerCache.find(x=>String(x.id)===String(id));
+  if(!a) return;
+  $('#brokerModalTitle').text('Edit Broker Account');
+  $('#brokerAccId').val(a.id);
+  $('#brokerLabel').val(a.account_label).trigger('input');
+  $('#brokerSelect').val(a.broker_id);
+  $('#brokerConfig').val(JSON.stringify(a.config || {}, null, 2)); // may be undefined from list; safe if you expand API
+  $('#brokerActive').prop('checked', !!a.is_active);
+  $('#deleteBrokerBtn, #testBrokerBtn').show();
+  $('#brokerModal').addClass('is-active');
+}
+function closeBrokerModal(){ $('#brokerModal').removeClass('is-active'); }
+
+function saveBroker(){
+  let conf = {};
+  const raw = $('#brokerConfig').val().trim();
+  if(raw){
+    try { conf = JSON.parse(raw); }
+    catch(e){ alert('Config must be valid JSON'); return; }
+  }
+  const payload = {
+    account_label: $('#brokerLabel').val().trim(),
+    broker_id: $('#brokerSelect').val(),
+    config: conf,
+    is_active: $('#brokerActive').is(':checked')
+  };
+  if(!payload.account_label){ alert('Label is required'); return; }
+
+  // dup client-side
+  const currentId = $('#brokerAccId').val() || null;
+  const dup = brokerCache.some(b => b.account_label.toLowerCase() === payload.account_label.toLowerCase()
+                                 && String(b.id)!==String(currentId));
+  if(dup){ $('#brokerLabelDup').show(); return; }
+
+  const url = currentId ? `/api/env/broker/${currentId}/` : '/api/env/brokers/';
+  $.ajax({url, method:'POST', contentType:'application/json', data:JSON.stringify(payload)})
+    .done(d => {
+      if(d.success){ closeBrokerModal(); loadBrokers(); }
+      else alert(d.error || 'Failed');
+    });
+}
+
+function deleteBroker(id){
+  if(!confirm('Delete this broker account?')) return;
+  $.ajax({url:`/api/env/broker/${id}/`, method:'DELETE'}).done(d=>{
+    if(d.success){ loadBrokers(); }
+  });
+}
+function testBroker(id){
+  $.post(`/api/env/broker/${id}/test/`, {}, function(d){
+    if(d.success){ 
+      loadBrokers(); 
+      alert(d.ok ? 'Connection OK' : ('Test failed: ' + (d.error||'')));
+    }
+  });
+}
+
+// ---------- Globals ----------
+function loadGlobals(){
+  const scope = $('#gvScope').val();
+  const algo = $('#gvAlgo').val();
+  let url = '/api/env/globals/';
+  const qs = [];
+  if(scope) qs.push('scope='+encodeURIComponent(scope));
+  if(scope==='algo' && algo) qs.push('algo='+encodeURIComponent(algo));
+  if(qs.length) url += '?' + qs.join('&');
+
+  $.get(url, function(d){
+    if(!d.success) return;
+    globalCache = d.globals || [];
+    let html = `
+      <table class="table is-striped is-narrow is-fullwidth">
+        <thead><tr>
+          <th>Key</th><th>Type</th><th>Scope</th><th>Value</th><th class="has-text-right">Actions</th>
+        </tr></thead><tbody>
+    `;
+    globalCache.forEach(g=>{
+      const scopeStr = g.user ? 'User'
+                      : (g.algo ? ('Algo#'+g.algo) : 'Global');
+      const preview = (g.dtype==='json') ? JSON.stringify(g.value) : (g.value ?? '');
+      html += `<tr data-id="${g.id}">
+        <td>${g.key}</td>
+        <td>${g.dtype}</td>
+        <td>${scopeStr}</td>
+        <td style="max-width:360px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${preview}</td>
+        <td class="has-text-right">
+          <div class="buttons are-small is-right">
+            <button class="button is-link is-light editGvBtn">Edit</button>
+            <button class="button is-danger is-light deleteGvBtn">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    $('#globalTableArea').html(html);
+  });
+}
+
+function openAddGlobal(){
+  $('#globalModalTitle').text('Add Global');
+  $('#gvId').val('');
+  $('#gvKey').val('').trigger('input');
+  $('#gvType').val('text');
+  $('#gvScopeForm').val('global').trigger('change');
+  $('#gvValue').val('');
+  $('#deleteGlobalBtn').hide();
+  $('#saveGlobalBtn').prop('disabled', false);
+  $('#globalModal').addClass('is-active');
+}
+function openEditGlobal(id){
+  const g = globalCache.find(x=>String(x.id)===String(id));
+  if(!g) return;
+  $('#globalModalTitle').text('Edit Global');
+  $('#gvId').val(g.id);
+  $('#gvKey').val(g.key).trigger('input');
+  $('#gvType').val(g.dtype);
+  if(g.user){ $('#gvScopeForm').val('user'); }
+  else if(g.algo){ $('#gvScopeForm').val('algo'); $('#gvAlgoForm').val(g.algo); }
+  else { $('#gvScopeForm').val('global'); }
+  $('#gvScopeForm').trigger('change');
+  const val = (g.dtype==='json') ? JSON.stringify(g.value || {}, null, 2) : (g.value ?? '');
+  $('#gvValue').val(val);
+  $('#deleteGlobalBtn').show();
+  $('#saveGlobalBtn').prop('disabled', false);
+  $('#globalModal').addClass('is-active');
+}
+function closeGlobalModal(){ $('#globalModal').removeClass('is-active'); }
+
+function saveGlobal(){
+  const key = ($('#gvKey').val()||'').trim();
+  if(!key){ alert('Key is required'); return; }
+
+  const dtype = $('#gvType').val();
+  let value = $('#gvValue').val();
+
+  // normalize to JSON for backend
+  if(dtype==='number'){
+    if(value === '') { value = null; }
+    else { const num = Number(value); if(isNaN(num)){ alert('Value must be a number'); return; } value = num; }
+  } else if(dtype==='json'){
+    try { value = value ? JSON.parse(value) : null; }
+    catch(e){ alert('Invalid JSON value'); return; }
+  } // text -> leave as string
+
+  const scope = $('#gvScopeForm').val();  // global|algo|user
+  const algo  = (scope==='algo') ? $('#gvAlgoForm').val() : null;
+
+  // client-side dup guard (per scope)
+  const currentId = $('#gvId').val() || null;
+  const dup = globalCache.some(g => {
+    const sameKey = g.key.toLowerCase() === key.toLowerCase();
+    const sameScope = (scope==='user' && g.user) || (scope==='algo' && String(g.algo)===String(algo)) || (scope==='global' && !g.user && !g.algo);
+    return sameKey && sameScope && String(g.id)!==String(currentId);
+  });
+  if(dup){ $('#gvKeyDup').show(); $('#saveGlobalBtn').prop('disabled', true); return; }
+
+  const payload = { key, dtype, value, scope, algo };
+  const url = currentId ? `/api/env/global/${currentId}/` : '/api/env/globals/';
+  $.ajax({url, method:'POST', contentType:'application/json', data:JSON.stringify(payload)})
+    .done(d=>{
+      if(d.success){ closeGlobalModal(); loadGlobals(); }
+      else alert(d.error || 'Failed');
+    });
+}
+
+function deleteGlobal(id){
+  if(!confirm('Delete this global variable?')) return;
+  $.ajax({url:`/api/env/global/${id}/`, method:'DELETE'}).done(d=>{
+    if(d.success){ loadGlobals(); }
+  });
+}
+
+// ---- UI wiring ----
+$(function(){
+  loadBrokers();
+  loadGlobals();
+
+  // Broker actions
+  $('#addBrokerBtn').on('click', openAddBroker);
+  $('#brokerTableArea').on('click','.editBrokerBtn', function(){ openEditBroker($(this).closest('tr').data('id')); });
+  $('#brokerTableArea').on('click','.deleteBrokerBtn', function(){ deleteBroker($(this).closest('tr').data('id')); });
+  $('#brokerTableArea').on('click','.testBrokerBtn', function(){ testBroker($(this).closest('tr').data('id')); });
+
+  // Broker dup warning live
+  $('#brokerLabel').on('input', function(){
+    const id = $('#brokerAccId').val() || null;
+    const val = ($(this).val()||'').trim().toLowerCase();
+    const dup = brokerCache.some(b => b.account_label.toLowerCase()===val && String(b.id)!==String(id));
+    $('#brokerLabelDup').toggle(dup);
+    $('#saveBrokerBtn').prop('disabled', dup);
+  });
+
+  // Global listing filters
+  $('#gvScope').on('change', function(){
+    $('#algoScopeCtrl').toggle($(this).val()==='algo');
+  });
+  $('#reloadGlobalsBtn').on('click', loadGlobals);
+
+  // Global modal
+  $('#addGlobalBtn').on('click', openAddGlobal);
+  $('#globalTableArea').on('click','.editGvBtn', function(){ openEditGlobal($(this).closest('tr').data('id')); });
+  $('#globalTableArea').on('click','.deleteGvBtn', function(){ deleteGlobal($(this).closest('tr').data('id')); });
+  $('#gvScopeForm').on('change', function(){
+    $('#gvAlgoCtrl').toggle($(this).val()==='algo');
+  });
+
+  // Dup check live for global key
+  $('#gvKey').on('input', function(){
+    const currentId = $('#gvId').val() || null;
+    const key = ($(this).val()||'').trim().toLowerCase();
+    const scope = $('#gvScopeForm').val();
+    const algo  = (scope==='algo') ? $('#gvAlgoForm').val() : null;
+
+    const dup = globalCache.some(g=>{
+      const sameKey = g.key.toLowerCase()===key;
+      const sameScope = (scope==='user' && g.user) || (scope==='algo' && String(g.algo)===String(algo)) || (scope==='global' && !g.user && !g.algo);
+      return sameKey && sameScope && String(g.id)!==String(currentId);
+    });
+    $('#gvKeyDup').toggle(dup);
+    $('#saveGlobalBtn').prop('disabled', dup);
+  });
+});
+</script>
+
+</body>
+</html>
+{% endblock %}
