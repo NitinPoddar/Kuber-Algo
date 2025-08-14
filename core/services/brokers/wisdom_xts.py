@@ -9,14 +9,16 @@ Created on Mon Aug 11 11:22:04 2025
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
-
+from zoneinfo import ZoneInfo
 from .base import BrokerClient
 
 # Try both import styles (pip vs vendored)
 from core.vendors.xts.Connect import XTSConnect  # fallback if you vendor
 import urllib
 import json
-from core.utils.parsers import parse_pipe_candles
+from core.utils.parsers import aggregate_to_bars,parse_pipe_ticks
+
+IST=ZoneInfo("Asia/Kolkata")
 # Map your timeframe strings to XTS compressionValue (minutes)
 _COMPRESSION = {
     "1m": 1, "3m": 3, "5m": 5, "10m": 10, "15m": 15, "30m": 30, "60m": 60,
@@ -61,7 +63,7 @@ def _tf_to_minutes(tf: str) -> int:
     return _COMPRESSION.get(tf, 5)
 
 def _now_range_for(tf_minutes: int, lookback: int) -> tuple[str, str]:
-    end = datetime.now()
+    end = datetime.now(IST)
     # crude: assume 1 bar == tf_minutes; ask for lookback * tf
     start = end - timedelta(minutes=lookback * max(1, tf_minutes))
     fmt = "%b %d %Y %H%M%S"
@@ -161,8 +163,9 @@ class WisdomClient(BrokerClient):
         # The SDK returns something like resp["result"]["dataReponse"] which may be JSON string or list
         result = resp.get("result", {})
         data = result.get("dataReponse") or result.get("dataResponse") or result.get("data") or []
-        rows=parse_pipe_candles(data)
-        return rows[-lookback:]
+        ticks = parse_pipe_ticks(data)  
+        bars=aggregate_to_bars(ticks, interval_min=tf_min)
+        return bars[-lookback:]
         #if isinstance(data, str):
          #   import json
           #  try:

@@ -106,7 +106,7 @@ def pick_account_for_mode(
     # explicit wins
     if account_id:
         try:
-            return BrokerAccount.objects.get(id=account_id, user=user)
+            return BrokerAccount.objects.get(id=account_id)
         except BrokerAccount.DoesNotExist:
             return None
 

@@ -729,7 +729,7 @@ def variable_parameters_page(request):
     current_category = categories.first() if categories else None
     variables = Variable.objects.filter(category=current_category) if current_category else []
     all_parameters = VariableParameter.objects.all()
-    return render(request, "VariableRelated/Variable_Parameters.html", {
+    return render(request, "variablerelated/Variable_Parameters.html", {
         "categories": categories,
         "current_category": current_category,
         "variables": variables,
@@ -912,15 +912,16 @@ def delete_user_variable(request):
 
 @login_required
 def check_algo_name(request):
-    name = request.GET.get("name", "").strip()
+    name = (request.GET.get('name') or '').strip()
+    exclude_id = request.GET.get('exclude_id')
+    qs = AlgoList.objects.filter(algo_name__iexact=name)
+    if exclude_id:
+      qs = qs.exclude(pk=exclude_id)
     if not name:
-        return JsonResponse({"valid": False, "message": "Name cannot be empty."})
-
-    exists = AlgoList.objects.filter(algo_name=name, created_by=request.user).exists()
-    if exists:
-        return JsonResponse({"valid": False, "message": "This algorithm name already exists."})
-    
-    return JsonResponse({"valid": True})
+      return JsonResponse({'valid': False, 'message': 'Algorithm name is required.'})
+    if qs.exists():
+      return JsonResponse({'valid': False, 'message': 'This algorithm name is already taken.'})
+    return JsonResponse({'valid': True})
 
 @require_http_methods(["POST"])
 @staff_member_required  # 👈 restrict to staff/admin users only

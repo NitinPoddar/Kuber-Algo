@@ -1,3 +1,80 @@
+// Put this near the top of condition.js
+// condition.js (top-level helpers)
+
+function getRowsContainer(hostOrId) {
+  const host = (typeof hostOrId === 'string') ? document.getElementById(hostOrId) : hostOrId;
+  if (!host) return null;
+
+  // If we're already a .conditions container, use it
+  if (host.classList && host.classList.contains('conditions')) return host;
+
+  // If root wrapper exists, use it
+  const existing = host.querySelector(':scope > .nested-condition > .conditions');
+  if (existing) return existing;
+
+  // Otherwise create a root wrapper (no rows yet)
+  const id = `group_${Math.random().toString(36).slice(2, 8)}`;
+  const div = document.createElement('div');
+  div.className = 'nested-condition mt-2';
+  div.innerHTML = `
+    <div class="is-flex is-justify-content-space-between mb-2">
+      <strong>Condition</strong>
+      <button type="button" class="delete" onclick="removeRootCondition('${host.id}', this)"></button>
+    </div>
+    <div class="field">
+      <label class="label">Connector</label>
+      <div class="select">
+        <select class="group-connector">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+        </select>
+      </div>
+    </div>
+    <div class="conditions" id="${id}"></div>
+    <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow('${id}')">➕ Add Condition</button>
+  `;
+  host.appendChild(div);
+  return div.querySelector('.conditions');
+}
+
+function ensureGroup(containerId) {
+  const host = document.getElementById(containerId);
+  if (!host) return null;
+
+  // If we're already inside a .conditions container, just use it
+  if (host.classList.contains('conditions')) return host;
+
+  // If a root group already exists, use its .conditions
+  const existing = host.querySelector(':scope > .nested-condition > .conditions');
+  if (existing) return existing;
+
+  // Otherwise create a root group wrapper (NO rows yet)
+  const id = `group_${Math.random().toString(36).slice(2, 8)}`;
+  const div = document.createElement('div');
+  div.className = 'nested-condition mt-2';
+  div.innerHTML = `
+    <div class="is-flex is-justify-content-space-between mb-2">
+      <strong>Condition</strong>
+      <button type="button" class="delete" onclick="removeRootCondition('${containerId}', this)"></button>
+    </div>
+    <div class="field">
+      <label class="label">Connector</label>
+      <div class="select">
+        <select class="group-connector">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+        </select>
+      </div>
+    </div>
+    <div class="conditions" id="${id}"></div>
+    <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow('${id}')">➕ Add Condition</button>
+  `;
+  host.appendChild(div);
+  return div.querySelector('.conditions');
+}
+
+
+
 function addLeg() {
   const container = document.getElementById("legsContainer");
   const legIndex = document.querySelectorAll(".leg-block").length;
@@ -127,47 +204,19 @@ function addConditionGroup(containerId) {
 }
 
 function addConditionRow(target) {
-  // 1) Locate the .conditions container
-  let container;
-  if (typeof target === 'string') {
-    container = document.getElementById(target);
-  } else {
-    container = target.closest('.nested-condition')?.querySelector('.conditions');
-  }
+  // target can be an element or an id
+  let container = (typeof target === 'string') ? document.getElementById(target) : target;
   if (!container) return;
 
-  // 2) If this group isn't wrapped yet, wrap it and bail
-  const isWrapped = container.closest('.nested-condition');
-  if (!isWrapped) {
-    const wrapper = document.createElement('div');
-    wrapper.classList.add("box", "nested-condition", "mt-3");
-    const groupId = `group_${Math.random().toString(36).substring(2, 8)}`;
-    wrapper.innerHTML = `
-      <div class="is-flex is-justify-content-space-between mb-2">
-        <strong>Condition Group</strong>
-        <button type="button" class="delete" onclick="this.closest('.nested-condition').remove()"></button>
-      </div>
-      <div class="field">
-        <label class="label">Connector</label>
-        <div class="select">
-          <select class="group-connector">
-            <option value="AND">AND</option>
-            <option value="OR">OR</option>
-          </select>
-        </div>
-      </div>
-      <div class="conditions" id="${groupId}"></div>
-      <button type="button" class="button is-small is-link mt-2" onclick="addConditionRow('${groupId}')">➕ Add Condition</button>
-    `;
-    container.appendChild(wrapper);
-    return;
-  }
+  // Always resolve to a real ".conditions" container (creates root wrapper if needed)
+  container = getRowsContainer(container);
+  if (!container) return;
 
-  // 3) Build a new condition-row
   const row = document.createElement('div');
   row.classList.add('condition-row', 'is-flex', 'is-align-items-center', 'mb-2');
 
-  // — LHS variable dropdown
+  // --- build your row exactly as before (unchanged UI bits) ---
+  // LHS
   const lhsWrapper = document.createElement('div');
   lhsWrapper.className = 'select mr-2';
   const lhsSelect = document.createElement('select');
@@ -177,12 +226,12 @@ function addConditionRow(target) {
   lhsWrapper.appendChild(lhsSelect);
   row.appendChild(lhsWrapper);
 
-  // — LHS parameters container
+  // LHS params
   const lhsParams = document.createElement('div');
   lhsParams.className = 'condition-parameters mr-2';
   row.appendChild(lhsParams);
 
-  // — Operator dropdown
+  // Operator
   const opWrapper = document.createElement('div');
   opWrapper.className = 'select mr-2';
   const opSelect = document.createElement('select');
@@ -198,19 +247,15 @@ function addConditionRow(target) {
   opWrapper.appendChild(opSelect);
   row.appendChild(opWrapper);
 
-  // — RHS Mode selector
+  // RHS mode + inputs
   const rhsModeWrapper = document.createElement('div');
   rhsModeWrapper.className = 'select mr-2';
   const rhsModeSelect = document.createElement('select');
   rhsModeSelect.className = 'rhs-mode';
-  rhsModeSelect.innerHTML = `
-    <option value="value">Value</option>
-    <option value="variable">Variable</option>
-  `;
+  rhsModeSelect.innerHTML = `<option value="value">Value</option><option value="variable">Variable</option>`;
   rhsModeWrapper.appendChild(rhsModeSelect);
   row.appendChild(rhsModeWrapper);
 
-  // — RHS value input
   const rhsValueInput = document.createElement('input');
   rhsValueInput.type = 'text';
   rhsValueInput.className = 'input mr-2 condition-value';
@@ -218,31 +263,28 @@ function addConditionRow(target) {
   rhsValueInput.style.width = '150px';
   row.appendChild(rhsValueInput);
 
-  // — RHS variable dropdown + params wrapper
   const rhsVarWrapper = document.createElement('div');
-  // use inline-flex so it doesn't become a full-width block
   rhsVarWrapper.className = 'rhs-input';
   rhsVarWrapper.style.display = 'none';
-  rhsVarWrapper.style.cssText += 'display:none; align-items:center; margin-right:0.5rem; display:inline-flex;';
+  rhsVarWrapper.style.alignItems = 'center';
+  rhsVarWrapper.style.marginRight = '0.5rem';
   const rhsVarSelect = document.createElement('select');
   rhsVarSelect.className = 'rhs-variable-dropdown inline-variable-dropdown';
   rhsVarSelect.innerHTML = getAllVariableOptionsHTML();
   rhsVarSelect.onchange = () => renderConditionVariableParams(rhsVarSelect);
   rhsVarWrapper.appendChild(rhsVarSelect);
-  // parameters under RHS variable
   const rhsParamDiv = document.createElement('div');
   rhsParamDiv.className = 'condition-parameters ml-2';
   rhsVarWrapper.appendChild(rhsParamDiv);
   row.appendChild(rhsVarWrapper);
 
-  // — Delete button
+  // Delete + subgroup
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete';
   deleteBtn.type = 'button';
   deleteBtn.onclick = () => row.remove();
   row.appendChild(deleteBtn);
 
-  // — Subgroup button
   const subgroupBtn = document.createElement('button');
   subgroupBtn.className = 'button is-small is-warning ml-2';
   subgroupBtn.type = 'button';
@@ -250,16 +292,18 @@ function addConditionRow(target) {
   subgroupBtn.onclick = () => addSubGroupToCondition(subgroupBtn);
   row.appendChild(subgroupBtn);
 
-  // initialize
+  // Init RHS state
   rhsModeSelect.value = 'value';
   rhsValueInput.style.display = '';
   rhsVarWrapper.style.display = 'none';
 
-  // 5) Activate Select2 on both dropdowns
-  $(lhsSelect).select2({ width: 'auto', placeholder: 'Select Variable' });
-  $(rhsVarSelect).select2({ width: 'auto', placeholder: 'Select Variable' });
+  // Select2 safe
+  if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+    $(lhsSelect).select2({ width: 'auto', placeholder: 'Select Variable' });
+    $(rhsVarSelect).select2({ width: 'auto', placeholder: 'Select Variable' });
+  }
 
-  // 6) Finally append the row
+  // ✅ Append to the intended container ONLY
   container.appendChild(row);
 }
  
@@ -326,65 +370,69 @@ function removeSubGroup(deleteBtn) {
   }
 }
 function extractConditions(container) {
-  const conditions = [];
-  const rows = container.querySelectorAll('.condition-row');
-  rows.forEach(row => {
-    const variable = row.querySelector('.condition-variable')?.value;
-    const operator = row.querySelector('.condition-operator')?.value;
-    const connector = row.closest('.nested-condition')?.querySelector('.group-connector')?.value || 'AND';
+  // 1) Work inside the current group's .conditions without creating UI
+  let rowsContainer;
+  if (container.classList.contains('conditions')) {
+    rowsContainer = container;
+  } else {
+    rowsContainer = container.querySelector(':scope > .nested-condition > .conditions');
+  }
+  if (!rowsContainer) return [];
 
-    // LHS Parameters
-    const paramDiv = row.querySelector('.condition-parameters');
-    const paramInputs = paramDiv ? paramDiv.querySelectorAll('input, select') : [];
+  // 2) Connector is defined at the group level
+  const groupWrap = rowsContainer.closest('.nested-condition');
+  const groupConnector = groupWrap?.querySelector('.group-connector')?.value || 'AND';
+
+  const conditions = [];
+
+  // 3) Only pick DIRECT rows of THIS group (no nested!)
+  rowsContainer.querySelectorAll(':scope > .condition-row').forEach(row => {
+    // LHS
+    const variable = row.querySelector('.condition-variable')?.value?.trim();
+    if (!variable) return; // skip empty rows
+
+    const operator = row.querySelector('.condition-operator')?.value || '==';
+
+    // LHS parameters (only from this row)
+    const lhsParamDiv = row.querySelector(':scope > .condition-parameters');
     const lhsParams = {};
-    paramInputs.forEach(p => {
-      const key = p.name.split('_').pop();
-      lhsParams[key] = p.value;
+    (lhsParamDiv ? lhsParamDiv.querySelectorAll('input, select') : []).forEach(p => {
+      const key = p.dataset.paramKey || p.name.split('_').pop();
+      if (p.value !== '') lhsParams[key] = p.value;
     });
 
-    // RHS: either value or variable
-    const rhsType = row.querySelector('.rhs-mode')?.value || 'value';
-    let rhs = { type: rhsType };
-    if (rhsType === 'value') {
-      rhs.value = row.querySelector('.condition-value')?.value || '';
-    } else {
-      const rhsVar = row.querySelector('.rhs-variable-dropdown')?.value;
-      const rhsParamDiv = row.querySelector('.rhs-variable-dropdown')?.closest('.rhs-input')?.querySelectorAll('input, select');
+    // RHS
+    const rhsMode = row.querySelector('.rhs-mode')?.value || 'value';
+    let rhs;
+    if (rhsMode === 'variable') {
+      const rhsVar = row.querySelector('.rhs-variable-dropdown')?.value || '';
+      const rhsParamDiv = row.querySelector('.rhs-input .condition-parameters');
       const rhsParams = {};
-      rhsParamDiv?.forEach(p => {
-        const key = p.name?.split('_')?.pop();
-        rhsParams[key] = p.value;
+      (rhsParamDiv ? rhsParamDiv.querySelectorAll('input, select') : []).forEach(p => {
+        const key = p.dataset.paramKey || p.name.split('_').pop();
+        if (p.value !== '') rhsParams[key] = p.value;
       });
-      rhs.name = rhsVar;
-      rhs.parameters = rhsParams;
+      rhs = { type: 'variable', name: rhsVar, parameters: rhsParams };
+    } else {
+      const val = row.querySelector('.condition-value')?.value || '';
+      rhs = { type: 'value', value: val };
     }
 
     const cond = {
-      lhs: {
-        name: variable,
-        parameters: lhsParams
-      },
+      lhs: { name: variable, parameters: lhsParams },
       operator,
       rhs,
-      connector,
+      connector: groupConnector, // stamp the group's AND/OR
       children: []
     };
 
-    // Try to find all nested condition containers directly under this row
-    const subgroups = row.querySelectorAll(':scope > .nested-condition > .conditions');
-    subgroups.forEach(subContainer => {
-      cond.children.push(...extractConditions(subContainer));
+    // 4) Recurse ONLY into direct subgroups of THIS row
+    row.querySelectorAll(':scope > .nested-condition > .conditions').forEach(subCont => {
+      const kids = extractConditions(subCont);
+      if (kids.length) cond.children.push(...kids);
     });
 
-    // (Fallback: If only a single nested condition per row, keep your original logic)
-    // const subContainer = row.querySelector('.nested-condition .conditions');
-    // if (subContainer) {
-    //   cond.children = extractConditions(subContainer);
-    // }
-
     conditions.push(cond);
-    // Log what is being extracted for debugging
-    console.log("Extracted condition:", cond);
   });
 
   return conditions;
@@ -439,144 +487,106 @@ function removeRootCondition(containerId, deleteBtn) {
     parent.appendChild(newBtn);
   }
 }
-function restoreConditionTree(containerId, conditions) {
-  const container = document.getElementById(containerId);
-  if (!container) {
-    console.error("restoreConditionTree: no container for", containerId);
-    return;
+function restoreConditionTree(containerIdOrEl, conditions) {
+  const host = (typeof containerIdOrEl === 'string') ? document.getElementById(containerIdOrEl) : containerIdOrEl;
+  if (!host) return;
+
+  // Work inside this group's .conditions container (create root group if needed)
+  const rowsContainer = getRowsContainer(host);
+  if (!rowsContainer) return;
+
+  // Clear only direct rows of THIS group
+  rowsContainer.querySelectorAll(':scope > .condition-row').forEach(r => r.remove());
+
+  // Set the group connector from the first cond, if present
+  const groupWrap = rowsContainer.closest('.nested-condition');
+  if (groupWrap && conditions?.length) {
+    const connSel = groupWrap.querySelector('.group-connector');
+    if (connSel) connSel.value = conditions[0].connector || 'AND';
   }
 
-  // Determine where .condition-row elements live
-  const rowsContainer = container.classList.contains('conditions')
-    ? container
-    : (container.querySelector('.conditions') || container);
-
-  // Remove any pre-existing rows
-  Array.from(rowsContainer.querySelectorAll('.condition-row'))
-    .forEach(r => r.remove());
-
-  // “Open” the root condition group if needed
-  const rootBtn = container.querySelector('button[data-root-btn]');
-  if (rootBtn) rootBtn.click();
-
-  // Rebuild each condition
   conditions.forEach((cond, idx) => {
-    console.log(`restore condition[${idx}] in ${containerId}`, cond);
+    // Add a fresh row to THIS group
+    addConditionRow(rowsContainer);   // pass element, not id
+    const row = rowsContainer.querySelector(':scope > .condition-row:last-of-type');
+    if (!row) return;
 
-    // 1) Add a new row into this container
-    addConditionRow(rowsContainer.id);
-    const row = rowsContainer.querySelector('.condition-row:last-of-type');
-    if (!row) {
-      console.error("Could not create row for", cond);
-      return;
-    }
-
-    // ─── LHS: variable + parameters ───────────────────────────────────────────
+    // LHS variable + params
     const lhsSel = row.querySelector('.condition-variable');
     if (lhsSel) {
-      // Select the variable via Select2 (or fallback)
-      if (typeof $ !== 'undefined' && $(lhsSel).select2) {
-        $(lhsSel).val(cond.lhs.name || '').trigger('change.select2');
+      if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+        $(lhsSel).val(cond.lhs?.name || '').trigger('change.select2');
       } else {
-        lhsSel.value = cond.lhs.name || '';
+        lhsSel.value = cond.lhs?.name || '';
+        lhsSel.dispatchEvent(new Event('change', { bubbles: true }));
       }
-
-      // Render its parameter inputs
       renderConditionVariableParams(lhsSel);
 
-      // Populate the symbol parameter first
-      const symSel = row.querySelector('.condition-parameters .symbol-dropdown');
-      const symVal = cond.lhs.parameters.symbol;
+      // symbol first
+      const symSel = row.querySelector(':scope > .condition-parameters .symbol-dropdown');
+      const symVal = cond.lhs?.parameters?.symbol;
       if (symSel && symVal) {
-        initSelect2(`#${symSel.id}`, "Select symbol");
-        if (![...symSel.options].some(o => o.value === symVal)) {
-          symSel.add(new Option(symVal, symVal, true, true));
-        }
-        $(symSel).trigger('change');
+        initSelect2(`#${symSel.id || (symSel.id = 'sym_'+Math.random().toString(36).slice(2,8))}`, "Select symbol");
+        if (![...symSel.options].some(o => o.value === symVal)) symSel.add(new Option(symVal, symVal, true, true));
+        if (typeof $ !== 'undefined') $(symSel).val(symVal).trigger('change.select2');
       }
-
-      // Populate any other LHS params
-      Object.entries(cond.lhs.parameters || {}).forEach(([k, v]) => {
+      // other params
+      Object.entries(cond.lhs?.parameters || {}).forEach(([k, v]) => {
         if (k === 'symbol') return;
-        const inp = row.querySelector(`.condition-parameters [name$="${k}"]`);
+        const inp = row.querySelector(`:scope > .condition-parameters [name$="${k}"]`);
         if (inp) inp.value = v;
       });
-    } else {
-      console.warn("No LHS variable dropdown in row", idx);
     }
 
-    // ─── Operator ─────────────────────────────────────────────────────────────
+    // Operator
     const opSel = row.querySelector('.condition-operator');
-    if (opSel) opSel.value = cond.operator;
+    if (opSel) opSel.value = cond.operator || '==';
 
-    // ─── Connector ────────────────────────────────────────────────────────────
-    const grpWrap = row.closest('.nested-condition');
-    if (grpWrap) {
-      const connSel = grpWrap.querySelector('.group-connector');
-      if (connSel) connSel.value = cond.connector;
-    }
-
-    // ─── RHS: value vs variable ────────────────────────────────────────────────
+    // RHS
     const rhsModeSel = row.querySelector('.rhs-mode');
     if (rhsModeSel) {
-      rhsModeSel.value = cond.rhs.type || 'value';
+      rhsModeSel.value = cond.rhs?.type || 'value';
       rhsModeSel.dispatchEvent(new Event('change', { bubbles: true }));
 
-      if (cond.rhs.type === 'value') {
+      if (cond.rhs?.type === 'value') {
         const valInp = row.querySelector('.condition-value');
-        if (valInp) valInp.value = cond.rhs.value;
+        if (valInp) valInp.value = cond.rhs.value ?? '';
       } else {
-        // Variable case
-        const varSel = row.querySelector('.rhs-variable-dropdown');
-        if (varSel) {
-          if (typeof $ !== 'undefined' && $(varSel).select2) {
-            $(varSel).val(cond.rhs.name || '').trigger('change.select2');
+        const rhsVarSelect = row.querySelector('.rhs-variable-dropdown');
+        if (rhsVarSelect) {
+          if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+            $(rhsVarSelect).val(cond.rhs?.name || '').trigger('change.select2');
           } else {
-            varSel.value = cond.rhs.name || '';
+            rhsVarSelect.value = cond.rhs?.name || '';
+            rhsVarSelect.dispatchEvent(new Event('change', { bubbles: true }));
           }
+          renderConditionVariableParams(rhsVarSelect);
 
-          // Render its parameters
-          renderConditionVariableParams(varSel);
-
-          // Populate the RHS symbol param
+          // RHS symbol
           const rhsSym = row.querySelector('.rhs-input .symbol-dropdown');
-          const rhsSymVal = cond.rhs.parameters.symbol;
+          const rhsSymVal = cond.rhs?.parameters?.symbol;
           if (rhsSym && rhsSymVal) {
-            initSelect2(`#${rhsSym.id}`, "Select symbol");
-            if (![...rhsSym.options].some(o => o.value === rhsSymVal)) {
-              rhsSym.add(new Option(rhsSymVal, rhsSymVal, true, true));
-            }
-            $(rhsSym).trigger('change');
+            initSelect2(`#${rhsSym.id || (rhsSym.id = 'rsym_'+Math.random().toString(36).slice(2,8))}`, "Select symbol");
+            if (![...rhsSym.options].some(o => o.value === rhsSymVal)) rhsSym.add(new Option(rhsSymVal, rhsSymVal, true, true));
+            if (typeof $ !== 'undefined') $(rhsSym).val(rhsSymVal).trigger('change.select2');
           }
-
-          // Populate any other RHS params
-          Object.entries(cond.rhs.parameters || {}).forEach(([k, v]) => {
+          // other RHS params
+          Object.entries(cond.rhs?.parameters || {}).forEach(([k, v]) => {
             if (k === 'symbol') return;
             const inp = row.querySelector(`.rhs-input [name$="${k}"]`);
             if (inp) inp.value = v;
           });
-        } else {
-          console.warn("No RHS variable dropdown in row", idx);
         }
       }
-    } else {
-      console.warn("No RHS mode selector in row", idx);
     }
 
-    // ─── Nested Subgroups ──────────────────────────────────────────────────────
+    // Nested children → create ONE subgroup under THIS row and recurse into its .conditions
     if (Array.isArray(cond.children) && cond.children.length) {
-      console.log(`  → ${cond.children.length} nested children for row ${idx}`);
-      const subBtn = row.querySelector('button.is-small.is-warning');
-      if (subBtn) {
-        addSubGroupToCondition(subBtn);
-        const subCont = row.querySelector('.nested-condition .conditions');
-        if (subCont) {
-          restoreConditionTree(subCont.id, cond.children);
-        } else {
-          console.warn("No sub-conditions container in row", idx);
-        }
-      } else {
-        console.warn("No subgroup button in row", idx);
+      const addSubBtn = row.querySelector('.button.is-small.is-warning');
+      if (addSubBtn) {
+        addSubGroupToCondition(addSubBtn);
+        const subCont = row.querySelector(':scope > .nested-condition > .conditions');
+        if (subCont) restoreConditionTree(subCont, cond.children); // pass element
       }
     }
   });
@@ -696,32 +706,137 @@ function restoreConditionTreeOld(containerId, conditions) {
   });
 }
 
-  function renderInlineVariableParams(selectEl, index) {
-    const variableName = selectEl.value;
-    const paramTarget = selectEl.closest('.field').querySelector('.parameters');
-    paramTarget.innerHTML = '';
+  // Expression builder param renderer (used by addExpressionVariable)
+function renderInlineVariableParams(selectEl, index) {
+  // Find the parameters container for the expression item
+  const field = selectEl.closest('.field'); // in expression builder, select is inside .field.box...
+  const paramTarget = field ? field.querySelector('.parameters') : null;
+  if (!paramTarget) return;
 
-    const variable = indicators.find(i => i.name === variableName);
-    if (!variable || !variable.parameters) return;
+  paramTarget.innerHTML = '';
 
-    variable.parameters.forEach(param => {
-      if (param.name.toLowerCase() === 'symbol') {
-        const symbolSelectId = `symbol_select_${index}_${Date.now()}`;
-        const symbolDropdown = document.createElement('select');
-        symbolDropdown.name = `const_expr_${index}_${variable.name}_${param.name}`;
-        symbolDropdown.className = 'symbol-dropdown select is-small mt-1';
-        symbolDropdown.id = symbolSelectId;
-        paramTarget.appendChild(symbolDropdown);
-        initSelect2(`#${symbolSelectId}`, "Select symbol");
-      } else {
-        const input = document.createElement('input');
-        input.className = 'input is-small mt-1';
-        input.placeholder = `${param.name}`;
-        input.name = `const_expr_${index}_${variable.name}_${param.name}`;
-        paramTarget.appendChild(input);
-      }
-    });
+  const variableName = selectEl.value;
+  if (!variableName) return;
+
+  // Try both indicators and userDefinedVariables (for UDV dependency chains)
+  const variable =
+    (Array.isArray(indicators) && indicators.find(i => i.name === variableName)) ||
+    (Array.isArray(userDefinedVariables) && userDefinedVariables.find(v => v.name === variableName));
+
+  if (!variable) {
+    // Unknown variable selected
+    const msg = document.createElement('div');
+    msg.className = 'has-text-danger has-text-weight-semibold';
+    msg.textContent = '⚠️ Unknown variable selected.';
+    paramTarget.appendChild(msg);
+    return;
   }
+
+  // User-defined variables usually have no declared parameters
+  if (!Array.isArray(variable.parameters) || variable.parameters.length === 0) {
+    const msg = document.createElement('div');
+    msg.className = 'has-text-grey-light is-size-7 is-italic mt-1';
+    msg.textContent = 'No parameters required.';
+    paramTarget.appendChild(msg);
+    return;
+  }
+
+  // Helper to pick a default value, with common fallbacks
+  const getDefault = (param) =>
+    param.default_value ?? param.default ?? param.defaultValue ?? param.example ?? '';
+
+  // Render each parameter with defaults/choices/type
+  variable.parameters.forEach(param => {
+    const pname = (param.name || '').toString();
+    const lower = pname.toLowerCase();
+    const defVal = getDefault(param);
+    const inputName = `const_expr_${index}_${variable.name}_${pname}`;
+
+    // SYMBOL → Select2 dropdown (with optional default)
+    if (lower === 'symbol') {
+      const symbolSelectId = `symbol_select_${index}_${Date.now()}`;
+      const symbolDropdown = document.createElement('select');
+      symbolDropdown.name = inputName;
+      symbolDropdown.className = 'symbol-dropdown select is-small mt-1';
+      symbolDropdown.id = symbolSelectId;
+      paramTarget.appendChild(symbolDropdown);
+
+      // init AJAX select2
+      if (typeof initSelect2 === 'function') {
+        initSelect2(`#${symbolSelectId}`, 'Select symbol');
+      }
+
+      // If there is a default symbol, inject & select it even if not in the AJAX list
+      if (defVal !== '' && defVal != null) {
+        symbolDropdown.add(new Option(defVal, defVal, true, true));
+        if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+          $(symbolDropdown).val(defVal).trigger('change.select2');
+        }
+      }
+      return; // done with symbol
+    }
+
+    // If param has discrete choices, render a <select>
+    if (Array.isArray(param.choices) && param.choices.length > 0) {
+      const wrap = document.createElement('div');
+      wrap.className = 'select is-small mt-1';
+      const sel = document.createElement('select');
+      sel.name = inputName;
+
+      // Optional empty placeholder if no default
+      if (defVal === '' || defVal == null) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = `Select ${pname}`;
+        sel.appendChild(opt);
+      }
+
+      param.choices.forEach(choice => {
+        // choices may be ['1m','5m'] or [{value:'1m', label:'1 min'}]
+        const value = (choice && typeof choice === 'object') ? (choice.value ?? choice.key ?? choice.name ?? choice.label) : choice;
+        const label = (choice && typeof choice === 'object') ? (choice.label ?? choice.name ?? choice.value ?? String(value)) : String(choice);
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        if (defVal != null && String(value) === String(defVal)) opt.selected = true;
+        sel.appendChild(opt);
+      });
+
+      wrap.appendChild(sel);
+      paramTarget.appendChild(wrap);
+      return;
+    }
+
+    // Otherwise, render an <input> and prefill default
+    const input = document.createElement('input');
+    input.className = 'input is-small mt-1';
+    input.placeholder = pname;
+    input.name = inputName;
+
+    // Basic type hinting
+    const t = (param.type || '').toString().toLowerCase();
+    if (t.includes('int') || t.includes('float') || t.includes('number')) {
+      input.type = 'number';
+      if (param.min != null) input.min = param.min;
+      if (param.max != null) input.max = param.max;
+      if (param.step != null) input.step = param.step;
+    } else {
+      input.type = 'text';
+    }
+
+    // Prefill default value
+    if (defVal !== undefined && defVal !== null) {
+      input.value = defVal;
+    }
+
+    paramTarget.appendChild(input);
+  });
+
+  // keep your validation in sync
+  if (typeof validateExpressionBuilder === 'function') {
+    validateExpressionBuilder(index);
+  }
+}
 
 function renderConditionVariableParams(selectEl) {
   const variableName = selectEl.value;

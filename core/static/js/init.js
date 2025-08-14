@@ -1,13 +1,31 @@
-form.addEventListener("submit", function(e) {
-  const legs = document.querySelectorAll('.leg-block');
-  legs.forEach((leg, idx) => {
+document.addEventListener('change', function (e) {
+  if (!e.target.classList.contains('rhs-mode')) return;
+  const row = e.target.closest('.condition-row');
+  const isVar = e.target.value === 'variable';
+  row.querySelector('.condition-value').style.display = isVar ? 'none' : '';
+  const rhs = row.querySelector('.rhs-input');
+  if (rhs) rhs.style.display = isVar ? 'inline-flex' : 'none';
+});
+
+
+
+form.addEventListener("submit", function () {
+  // 1) Clean prior hidden fields so we don't stack them
+  form.querySelectorAll('input[name^="entry_conditions_json_"], input[name^="exit_conditions_json_"]')
+      .forEach(n => n.remove());
+
+  // 2) Serialize current DOM -> hidden inputs
+  const legBlocks = document.querySelectorAll('.leg-block');
+  legBlocks.forEach((_, idx) => {
     const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
-    const exit = extractConditions(document.getElementById(`exit_conditions_${idx}`));
+    const exit  = extractConditions(document.getElementById(`exit_conditions_${idx}`));
+
     const entryInput = document.createElement('input');
     entryInput.type = 'hidden';
     entryInput.name = `entry_conditions_json_${idx}`;
     entryInput.value = JSON.stringify(entry);
     form.appendChild(entryInput);
+
     const exitInput = document.createElement('input');
     exitInput.type = 'hidden';
     exitInput.name = `exit_conditions_json_${idx}`;
@@ -15,6 +33,7 @@ form.addEventListener("submit", function(e) {
     form.appendChild(exitInput);
   });
 });
+
 $(function () {
   $(document).on('mouseenter', '.constant-builder', function () {
     $(this).sortable({
@@ -58,9 +77,9 @@ document.addEventListener("DOMContentLoaded", function () {
   fundInput.addEventListener("input", validateFields);
 
   if (window.isEditMode) {
-    const legs = Array.isArray(window.legs) ? window.legs : [];
+    const legsFromServer = Array.isArray(window.initialLegs) ? window.initialLegs : initialLegs;
 
-      legs.forEach((leg, idx) => {
+      legsFromServer.forEach((leg, idx) => {
         addLeg();
         const legBlock = document.querySelectorAll('.leg-block')[idx];
         const select = legBlock.querySelector(`.instrument-dropdown`);
@@ -79,10 +98,8 @@ document.addEventListener("DOMContentLoaded", function () {
           legBlock.querySelector(`select[name='order_type[]']`).value = leg.order_type;
 
           // Add and restore conditions
-          addRootCondition(`entry_conditions_${idx}`, legBlock.querySelector(`#entry_conditions_${idx} + button`));
           restoreConditionTree(`entry_conditions_${idx}`, leg.entry_conditions);
     
-          addRootCondition(`exit_conditions_${idx}`, legBlock.querySelector(`#exit_conditions_${idx} + button`));
           restoreConditionTree(`exit_conditions_${idx}`, leg.exit_conditions);
         }, 300); // delay ensures DOM is ready
       });

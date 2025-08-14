@@ -3,6 +3,67 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+.navbar {
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-item.has-text-white {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            color: #ffffff !important;
+        }
+
+        .navbar-item.has-text-white:hover {
+            background-color: #00795c;
+        }
+
+        .content-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            margin-top: 2rem;
+        }
+
+        footer.footer {
+            background-color: #eaf7f0;
+            color: #4a4a4a;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .notification {
+            margin-bottom: 1rem;
+        }
+
+        .dropdown.is-right .dropdown-menu {
+            right: 0;
+            left: auto;
+        }
+
+        .user-dropdown-trigger {
+            border-radius: 999px;
+            background-color: #00c4a7;
+            color: #ffffff;
+            padding: 0.4em 0.9em;
+            font-size: 0.85rem;
+            font-weight: 500;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .user-dropdown-trigger:hover {
+            background-color: #00795c;
+        }
+
+        .user-dropdown-item {
+            font-size: 0.85rem;
+        }
+
 .button.is-add-leg {
   background-color: #00795c;
   color: white;
@@ -24,16 +85,535 @@ body {
     align-items: center;
     gap: 5px;
 }
-<style>
-  .nested-condition {
-    margin-top: 10px;
-    padding: 10px;
-    background: #f9f9f9;
-    border-left: 3px solid #00d1b2;
-  }
+/* ===== Better rails & nesting ===== */
+/* ===========================
+   Condition Builder — Visuals
+   =========================== */
 
-  .nested-condition .nested-condition {
-    margin-left: 1.5rem;
-    border-color: #3273dc; /* darker for sub-level */
+:root{
+  /* rails */
+  --rail:    #5e5ce6;      /* primary vertical rail */
+  --rail-2:  #8ea2ff;      /* nested rail */
+
+  /* cards */
+  --row-bg:      #ffffff;
+  --row-border:  #e6e8f0;
+  --focus-ring:  rgba(94,92,230,.25);
+
+  /* entry / exit tints */
+  --entry-bg:     #f6fff6; /* very light green */
+  --entry-border: #d6f5d6;
+  --exit-bg:      #fff7f6; /* very light red/orange */
+  --exit-border:  #ffd7d1;
+  --card-bg: #ffffff;
+  --card-border: var(--row-border, #e6e8f0);
+  --card-shadow: 0 2px 10px rgba(0,0,0,.04);
+  --leg-accent: #f7b7a3; /* leg left stripe */
+
+
+}
+
+/* ===========================
+   Page blocks & leg styling
+   =========================== */
+
+/* Accent vars (reuse if you already defined --row-border etc.) */
+}
+
+/* General card for big sections (details, strategy, preview) */
+#basicDetailsSection,
+#strategySection,
+#jsonPreviewBox{
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: var(--card-shadow);
+  margin-top: 1rem;
+}
+
+/* Leg blocks: stronger border + subtle accent stripe */
+.box.leg-block{
+  position: relative;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--card-shadow);
+  padding-top: .9rem; /* room for header */
+}
+.box.leg-block > .subtitle{
+  margin-top: .2rem;
+  margin-bottom: .75rem;
+  font-weight: 600;
+}
+.box.leg-block::before{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 14px 0 0 14px;
+  background: var(--leg-accent);
+  opacity: .9;
+}
+
+/* User-defined variable cards */
+#userConstantsContainer .box{
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.03);
+}
+
+/* JSON preview box matches */
+#jsonPreviewBox{
+  border-style: dashed;
+}
+
+/* Minor polish for field separators inside cards */
+#basicDetailsSection .field + .field,
+.box.leg-block .field + .field{
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px dashed #edf0f6;
+}
+
+/* Mobile spacing */
+@media (max-width: 768px){
+  #basicDetailsSection,
+  #strategySection,
+  #jsonPreviewBox,
+  .box.leg-block,
+  #userConstantsContainer .box{
+    border-radius: 12px;
+    padding: .9rem;
   }
-</style>
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark){
+  :root{
+    --card-bg: #14161a;
+    --card-border: #2a2e37;
+    --card-shadow: 0 1px 4px rgba(0,0,0,.5);
+    --leg-accent: #8ea2ff;
+  }
+  #basicDetailsSection,
+  #strategySection,
+  #jsonPreviewBox,
+  .box.leg-block,
+  #userConstantsContainer .box{
+    box-shadow: none;
+  }
+}
+
+/* ----- Rails & Group Wrapper ----- */
+.nested-condition{
+  position: relative;
+  border-left: 3px solid var(--rail);
+  padding-left: 12px;
+  margin-left: 8px;
+  border-radius: 10px;
+  background: transparent; /* let rows provide tint */
+}
+
+/* deeper nesting: lighter rail */
+.nested-condition .nested-condition{
+  border-left-color: var(--rail-2);
+}
+
+/* elbow line from rail to each row */
+.condition-row{
+  position: relative;
+}
+.condition-row::before{
+  content: "";
+  position: absolute;
+  left: -14px;                 /* meets the rail */
+  top: 1.2em;
+  width: 12px;
+  border-top: 2px solid var(--rail);
+  pointer-events: none;
+  z-index: 0;                  /* sit behind controls */
+}
+.nested-condition .nested-condition .condition-row::before{
+  border-top-color: var(--rail-2);
+}
+
+/* ----- Card look & non-overlapping layout ----- */
+.condition-row{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: .5rem;
+  background: var(--row-bg);
+  border: 1px solid var(--row-border);
+  border-radius: 10px;
+  padding: .55rem .65rem;
+  margin-bottom: .6rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,.02);
+  z-index: 1; /* above elbow line */
+  transition: box-shadow .15s ease, background .15s ease, border-color .15s ease;
+}
+.condition-row:hover{ box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+.condition-row:focus-within{
+  box-shadow: 0 0 0 2px var(--focus-ring);
+  border-color: #cfd4ff;
+}
+
+/* LHS variable select (first .select.mr-2) */
+.condition-row > .select.mr-2:first-child{
+  flex: 0 0 240px;   /* fixed column */
+  min-width: 200px;
+}
+
+/* LHS parameters expand */
+.condition-row .condition-parameters{
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+/* Operator & RHS mode are compact */
+.condition-row .condition-operator{ width: 90px; }
+.condition-row .rhs-mode{ width: 140px; }
+
+/* RHS value / variable+params get room */
+.condition-row .condition-value{
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+.condition-row .rhs-input{
+  flex: 1 1 260px;
+  min-width: 220px;
+  display: inline-flex;   /* toggled by JS */
+  align-items: center;
+  gap: .4rem;
+}
+
+/* Actions compact */
+.condition-row .delete{ margin-left: .25rem; }
+.condition-row .button.is-small.is-warning{ margin-left: .25rem; }
+
+/* ----- Entry/Exit tints by container ----- */
+[id^="entry_conditions_"] .condition-row{
+  background: var(--entry-bg);
+  border-color: var(--entry-border);
+}
+[id^="exit_conditions_"] .condition-row{
+  background: var(--exit-bg);
+  border-color: var(--exit-border);
+}
+
+/* ----- Validation highlight (existing class) ----- */
+.condition-row.highlight-red{
+  border: 2px dashed #ff5a5f;
+  background: #fff0f0;
+}
+
+/* ----- Select2 sanity ----- */
+.select2-container{
+  width: 100% !important;   /* respect parent width */
+  z-index: 30;              /* above rails/cards */
+}
+.select2-container .select2-dropdown{ z-index: 2000; }
+
+/* Inline dropdowns should not shrink too far on desktop */
+.inline-variable-dropdown,
+.rhs-variable-dropdown{ min-width: 180px; }
+
+/* ----- Mobile & tablet breakpoints ----- */
+@media (max-width: 1024px){
+  .condition-row > .select.mr-2:first-child{ flex: 1 1 320px; min-width: 280px; }
+  .condition-row .condition-parameters{ flex: 1 1 320px; }
+}
+
+@media (max-width: 768px){
+  .condition-row{
+    padding: .75rem;
+    gap: .6rem .5rem;
+  }
+  .condition-row > .select,
+  .condition-row .condition-parameters,
+  .condition-row .rhs-input,
+  .condition-row .condition-value{
+    flex: 1 1 100%;
+    min-width: 100% !important;
+  }
+  .condition-row .condition-operator,
+  .condition-row .rhs-mode{
+    width: 100%;
+  }
+  .nested-condition{
+    border-left-width: 2px;
+    padding-left: 10px;
+    margin-left: 6px;
+  }
+  .condition-row::before{ width: 10px; left: -12px; }
+}
+
+/* tiny phones */
+@media (max-width: 420px){
+  .inline-variable-dropdown,
+  .rhs-variable-dropdown{ min-width: 0; }
+}
+
+/* ----- Dark mode (optional, auto via OS) ----- */
+@media (prefers-color-scheme: dark){
+  :root{
+    --row-bg:       #14161a;
+    --row-border:   #2a2e37;
+    --entry-bg:     #101a12;
+    --entry-border: #223a2a;
+    --exit-bg:      #1a1413;
+    --exit-border:  #3a2420;
+    --focus-ring:   rgba(134,179,255,.35);
+  }
+  .condition-row{ box-shadow: none; }
+  .condition-row:hover{ box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset; }
+}
+
+/* ================================
+   Mobile-First Responsive Layer
+   ================================ */
+
+/* CSS vars for easy theming */
+:root{
+  --brand: #2563eb;            /* primary */
+  --brand-ink: #0f172a;        /* text */
+  --muted: #64748b;            /* secondary text */
+  --line: #e5e7eb;             /* borders */
+  --soft: #f8fafc;             /* light surfaces */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger:  #ef4444;
+
+  --radius: 12px;
+  --shadow: 0 6px 18px rgba(2, 6, 23, .06);
+}
+
+/* Base type + spacing */
+html{ font-size: 16px; }
+body{
+  font-family: "Inter", "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--brand-ink);
+  background: #ffffff;
+}
+.section{ padding: 2rem 1rem; }
+.content-box{ background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); }
+
+/* Headings tighten on small screens */
+h1.title{ font-weight: 700; letter-spacing: -0.02em; }
+
+/* ----------------
+   Navbar (Bulma)
+   ---------------- */
+.navbar{ box-shadow: 0 2px 10px rgba(2,6,23,.05); }
+.navbar .navbar-item, .navbar .navbar-link{ color: #fff; }
+.navbar-burger{ height: 3rem; width: 3rem; }
+.navbar-menu{ backdrop-filter: saturate(140%) blur(6px); }
+.navbar-item.button{ color: #111 !important; }
+
+/* ----------------
+   Boxes & Cards
+   ---------------- */
+.box{
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Leg blocks get a subtle accent border */
+.leg-block{
+  border-left: 4px solid var(--brand);
+}
+
+/* ----------------
+   Forms
+   ---------------- */
+.field{ margin-bottom: 0.9rem; }
+.label{ font-weight: 600; font-size: .95rem; color: var(--brand-ink); }
+.input, .textarea, .select select{
+  border-radius: 10px;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.input:focus, .textarea:focus, .select select:focus{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 0.15rem rgba(37,99,235,.15);
+}
+.help.is-danger{ margin-top: .35rem; }
+
+/* Make action buttons easy to tap on phones */
+.button{ border-radius: 10px; }
+@media (max-width: 768px){
+  .button:not(.navbar-item){ width: 100%; }
+  .buttons .button{ margin-right: 0; margin-bottom: .5rem; }
+}
+
+/* ----------------
+   Select2 polish
+   ---------------- */
+.select2-container{ width: 100% !important; }
+.select2-selection{
+  min-height: 2.4rem !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+}
+.select2-selection__rendered{ line-height: 2.3rem !important; padding-left: .75rem !important; }
+.select2-selection__arrow{ height: 2.3rem !important; }
+.select2-dropdown{ border-color: var(--line) !important; border-radius: 10px !important; }
+.select2-results__option{ padding: .55rem .75rem; font-size: .95rem; }
+
+/* Select2 inside modal / overflow contexts */
+.modal.is-active .select2-container{ z-index: 9999 !important; }
+
+/* ----------------
+   Condition Editor
+   ---------------- */
+.nested-condition{
+  border-left: 3px solid #9aa7ff;  /* more pronounced line */
+  background: #f8f9ff;             /* soft tint */
+  padding: .75rem .75rem .75rem 1rem;
+  margin-left: .25rem;
+  border-radius: 10px;
+}
+.condition-row{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-auto-rows: auto;
+  gap: .5rem .5rem;
+  padding: .5rem;
+  border: 1px dashed #c7d2fe;
+  border-radius: 10px;
+  background: #ffffff;
+}
+.condition-row .select,
+.condition-row .rhs-input,
+.condition-row .condition-parameters,
+.condition-row .input{
+  min-width: 0; /* fix overflow */
+}
+
+/* Stack condition row controls on small screens */
+@media (max-width: 768px){
+  .condition-row{
+    grid-template-columns: 1fr; /* full width stack */
+  }
+  .condition-row .delete,
+  .condition-row .button.is-small.is-warning{
+    justify-self: end;
+  }
+}
+
+/* Visual grouping for the expression builder items */
+.expression-item .field.box{
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+/* Subtle highlight when something is invalid */
+.condition-row.highlight-red{
+  border: 2px dashed var(--danger);
+  background: #fff5f5;
+}
+
+/* ----------------
+   User Vars (UDV)
+   ---------------- */
+.udv-header{ margin-bottom: .5rem; }
+#userConstantsContainer .is-size-7{
+  font-style: italic;
+  background: #f4f7ff;
+  padding: .25rem .5rem;
+  border-left: 3px solid var(--success);
+}
+
+/* ----------------
+   Legs layout
+   ---------------- */
+#legsContainer{
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+}
+.leg-block{
+  grid-column: span 12;
+}
+@media (min-width: 1024px){
+  .leg-block{ grid-column: span 6; } /* 2-up on desktop */
+}
+
+/* ----------------
+   Preview panels
+   ---------------- */
+#jsonPreviewBox pre{
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  max-height: 45vh;
+  overflow: auto;
+  background: #0b1020;
+  color: #e5e7eb;
+  border-radius: 10px;
+  padding: .75rem 1rem;
+}
+
+/* ----------------
+   Tables
+   ---------------- */
+.table-wrapper{
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.table{ min-width: 640px; }
+
+/* ----------------
+   Notifications
+   ---------------- */
+.notification{
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+/* ----------------
+   Footer spacing
+   ---------------- */
+.footer{ padding: 1.5rem 1rem; }
+
+/* ----------------
+   Small-screen tweaks
+   ---------------- */
+@media (max-width: 1024px){
+  .section{ padding: 1.5rem 1rem; }
+  .content-box{ padding: 1rem; }
+  h1.title{ font-size: 1.5rem; }
+}
+@media (max-width: 768px){
+  html{ font-size: 15px; }
+  .section{ padding: 1rem .75rem; }
+  .content-box{ padding: .9rem; }
+  h1.title{ font-size: 1.35rem; }
+}
+@media (max-width: 480px){
+  html{ font-size: 14px; }
+  h1.title{ font-size: 1.25rem; }
+}
+
+/* ----------------
+   Utilities
+   ---------------- */
+.mobile-hide   { display: none !important; }
+@media (min-width: 769px){ .mobile-hide{ display: initial !important; } }
+
+.mobile-only   { display: initial !important; }
+@media (min-width: 769px){ .mobile-only{ display: none !important; } }
+
+.mobile-stack  { display: flex; flex-direction: column; gap: .5rem; }
+.mobile-fullwidth{ width: 100% !important; }
+
+/* Ensure long select2 dropdowns are visible above Bulma boxes */
+.select2-container--open{ z-index: 9999 !important; }

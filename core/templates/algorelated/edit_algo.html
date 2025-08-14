@@ -36,8 +36,8 @@ Created on Tue Aug  5 23:18:49 2025
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
   <!-- Your custom styles -->
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
-
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v={% now 'U' %}">
+  
   <!-- jQuery (Only Once) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -78,6 +78,9 @@ Created on Tue Aug  5 23:18:49 2025
               <label class="label">Description</label>
               <textarea class="textarea" name="Algo_description" id="Algo_description">{{ algo.algo_description}}</textarea>
             </div>
+            <div class="field mt-4">
+              <button type="button" class="button is-primary" id="defineStrategyBtn" disabled onclick="showStrategySection()">🚀 Define Strategy</button>
+            </div>
           </div>
         
           <!-- SECTION 2: Initially Hidden but visible when edited -->
@@ -114,74 +117,7 @@ Created on Tue Aug  5 23:18:49 2025
   <pre><code id="pythonPreview"></code></pre>
 </div>
 <style>
-  .nested-condition {
-    border-left: 2px solid #7a7a7a;
-    margin-left: 1rem;
-    padding-left: 1rem;
-    position: relative;
-  }
-  .nested-condition::before {
-    content: "";
-    position: absolute;
-    left: -1.4rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 1.4rem;
-    height: 2px;
-    background-color: #7a7a7a;
-  }
-  .condition-row {
-    position: relative;
-    margin-left: 1.5rem;
-  }
-  .condition-row::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: -1.4rem;
-    transform: translateY(-50%);
-    width: 1.2rem;
-    height: 1px;
-    background-color: #9999ff;
-  }
   
-   .constant-item .handle::before {
-    content: '\2630'; /* ☰ */
-    margin-right: 5px;
-    cursor: move;
-    color: #777;
-  }
-
-    .select2-container {
-      min-width: 100%;
-      width: 100% !important;
-    }
-    #userConstantsContainer .expression_builder {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: flex-start;
-}
-
-.condition-row.highlight-red {
-  border: 2px dashed red;
-  background-color: #fff0f0;
-}
-
-
-#userConstantsContainer .is-size-7 {
-  font-style: italic;
-  background-color: #f4f4f4;
-  padding: 0.25rem 0.5rem;
-  border-left: 3px solid #00c4a7;
-}
-
-#userConstantsContainer .field,
-#userConstantsContainer .expression_builder,
-#userConstantsContainer .buttons {
-  transition: all 0.3s ease;
-}
-
 </style>
 
 <div class="modal" id="varInUseModal">
@@ -214,35 +150,30 @@ Created on Tue Aug  5 23:18:49 2025
   window.all_symbols          = {{ symbol_list_json|safe }};
   window.userDefinedVariables = {{ user_vars_json|safe }};
   window.legs                 = {{ legs_json|safe }};
-  window.isEditMode           = true;
-
+  
 // 2) Expose the edit‐mode flag
 window.isEditMode   = {{ is_edit_mode|yesno:"true,false" }};
 
 
-  document.getElementById("AlgoName").addEventListener("input", function validateName() {
-    const name = this.value.trim();
-    fetch(`/check_algo_name/?name=${encodeURIComponent(name)}`)
-      .then(r=>r.json())
-      .then(data=>{
-        const fb = document.getElementById("algoNameError");
-        const btn = document.getElementById("defineStrategyBtn");
-        if (data.valid) {
-          fb.style.display="none"; this.classList.remove("is-danger");
-          btn.disabled = !document.getElementById("MinimumFund").value.trim();
-        } else {
-          fb.textContent = data.message; fb.style.display="block";
-          this.classList.add("is-danger"); btn.disabled = true;
-        }
-      });
-  });
-
 </script>
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof initAlgoFormValidation !== 'function') return;
+  initAlgoFormValidation({
+    gateBtnId: null,
+    excludeId: {{ algo.id }},
+    endpoint: '/check_algo_name/'
+  });
+});
+</script>
+{% endblock %}
 
 <script src="{% static 'js/utils.js' %}"></script>
 <script src="{% static 'js/expression.js' %}"></script>
 <script src="{% static 'js/condition.js' %}"></script>
 <script src="{% static 'js/preview.js' %}"></script>
 <script src="{% static 'js/init.js' %}"></script>
+
 
 {% endblock %}

@@ -9,28 +9,11 @@ Created on Tue Aug  5 23:18:49 2025
 {% extends 'core/base.html' %}
 {% load static %}
 
+
 {% block content %}
 
-
-
-
- <html lang="en">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Add Algo{% endblock %}</title>
-
-  <!-- Bulma CSS -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
-
-  <!-- Select2 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-
-  <!-- Optional Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Your custom styles -->
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
-
+ 
+  
   <!-- jQuery (Only Once) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -41,7 +24,6 @@ Created on Tue Aug  5 23:18:49 2025
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <body>
-
 
 <section class="section">
   <div class="container">
@@ -56,14 +38,14 @@ Created on Tue Aug  5 23:18:49 2025
       <label class="label">Algorithm Name <span class="has-text-danger">*</span></label>
       <input class="input" type="text" name="AlgoName" id="AlgoName"
        value="{{ algo.algo_name|default:'' }}" required>
-      <p class="help is-danger" id="algoNameError" style="display: none;">Algorithm name is required.</p>
+      <p class="help is-danger" id="algoNameError" role="alert" style="display: none;">Algorithm name is required.</p>
     </div>
 
     <div class="field">
       <label class="label">Minimum Fund Required <span class="has-text-danger">*</span></label>
       <input class="input" type="number" name="Minimum_Fund_Reqd" id="MinimumFund"
        value="{{ algo.minimum_fund_reqd|default:'' }}" required>
-      <p class="help is-danger" id="fundError" style="display: none;">Minimum fund is required.</p>
+      <p class="help is-danger" id="fundError" role="alert" style="display: none;">Minimum fund is required.</p>
     </div>
 
     <div class="field">
@@ -108,117 +90,40 @@ Created on Tue Aug  5 23:18:49 2025
   <h2 class="subtitle mt-3">🐍 Python Preview</h2>
   <pre><code id="pythonPreview"></code></pre>
 </div>
-<style>
-  .nested-condition {
-    border-left: 2px solid #7a7a7a;
-    margin-left: 1rem;
-    padding-left: 1rem;
-    position: relative;
-  }
-  .nested-condition::before {
-    content: "";
-    position: absolute;
-    left: -1.4rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 1.4rem;
-    height: 2px;
-    background-color: #7a7a7a;
-  }
-  .condition-row {
-    position: relative;
-    margin-left: 1.5rem;
-  }
-  .condition-row::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: -1.4rem;
-    transform: translateY(-50%);
-    width: 1.2rem;
-    height: 1px;
-    background-color: #9999ff;
-  }
-  
-   .constant-item .handle::before {
-    content: '\2630'; /* ☰ */
-    margin-right: 5px;
-    cursor: move;
-    color: #777;
-  }
-
-    .select2-container {
-      min-width: 100%;
-      width: 100% !important;
-    }
-    #userConstantsContainer .expression_builder {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: flex-start;
-}
-
-.condition-row.highlight-red {
-  border: 2px dashed red;
-  background-color: #fff0f0;
-}
 
 
-#userConstantsContainer .is-size-7 {
-  font-style: italic;
-  background-color: #f4f4f4;
-  padding: 0.25rem 0.5rem;
-  border-left: 3px solid #00c4a7;
-}
-
-#userConstantsContainer .field,
-#userConstantsContainer .expression_builder,
-#userConstantsContainer .buttons {
-  transition: all 0.3s ease;
-}
-
-</style>
-
-<div class="modal" id="varInUseModal">
-  <div class="modal-background"></div>
-  <div class="modal-card">
-    <header class="modal-card-head">
-      <p class="modal-card-title">Cannot Delete Variable</p>
-      <button class="delete" aria-label="close" onclick="closeVarInUseModal()"></button>
-    </header>
-    <section class="modal-card-body">
-      <p class="has-text-danger">❌ This variable is currently being used in one or more condition rows.</p>
-      <p>Please remove it from those rows before deleting.</p>
-    </section>
-    <footer class="modal-card-foot">
-      <button class="button" onclick="closeVarInUseModal()">OK</button>
-    </footer>
-  </div>
-</div>
 <script>
 // 1) Expose the raw JSON directly to JS variables (no parsing needed in utils.js)
 window.instruments  = {{ instruments_json|safe }};
 window.indicators   = {{ indicators_json|safe }};
 window.all_symbols  = {{ symbol_list_json|safe }};
-
-  document.getElementById("AlgoName").addEventListener("input", function validateName() {
-    const name = this.value.trim();
-    fetch(`/check_algo_name/?name=${encodeURIComponent(name)}`)
-      .then(r=>r.json())
-      .then(data=>{
-        const fb = document.getElementById("algoNameError");
-        const btn = document.getElementById("defineStrategyBtn");
-        if (data.valid) {
-          fb.style.display="none"; this.classList.remove("is-danger");
-          btn.disabled = !document.getElementById("MinimumFund").value.trim();
-        } else {
-          fb.textContent = data.message; fb.style.display="block";
-          this.classList.add("is-danger"); btn.disabled = true;
-        }
-      });
-  });
-
+window.userDefinedVariables = [];   // add page starts empty
+window.legs = [];                   // add page starts empty
+window.isEditMode = false;
+  
 </script>
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initAlgoFormValidation !== 'function') {
+      console.error('initAlgoFormValidation not loaded');
+      return;
+    }
+    // Add Algo:
+    // initAlgoFormValidation({ gateBtnId: 'defineStrategyBtn', excludeId: null });
+    // Edit Algo:
+    // initAlgoFormValidation({ gateBtnId: null, excludeId: {{ algo.id }} });
+
+    initAlgoFormValidation({
+      gateBtnId: 'defineStrategyBtn',   // null on edit page
+      excludeId: null,                  // set to {{ algo.id }} on edit page
+      endpoint: '/check_algo_name/'
+    });
+  });
+</script>
+{% endblock %}
+
+
 
 <script src="{% static 'js/utils.js' %}"></script>
 <script src="{% static 'js/expression.js' %}"></script>
@@ -226,4 +131,6 @@ window.all_symbols  = {{ symbol_list_json|safe }};
 <script src="{% static 'js/preview.js' %}"></script>
 <script src="{% static 'js/init.js' %}"></script>
 
+
 {% endblock %}
+

@@ -1,47 +1,48 @@
-function renderPython(conditions, indent = 1) {
+function renderPython(conditions, indent = 1, connector = 'AND') {
   const pad = '  '.repeat(indent);
   let code = '';
 
-  conditions.forEach(cond => {
-    // Format LHS
-    const lhsParams = Object.entries(cond.lhs.parameters || {})
+  conditions.forEach((cond, i) => {
+    const lhsParams = Object.entries(cond.lhs?.parameters || {})
       .map(([k, v]) => `${k}='${v}'`).join(', ');
-    const lhsStr = `${cond.lhs.name}(${lhsParams})`;
+    const lhsStr = cond.lhs?.name ? `${cond.lhs.name}(${lhsParams})` : '/* missing_lhs */';
 
-    // Format RHS
     let rhsStr = '';
-    if (cond.rhs.type === 'value') {
+    if (cond.rhs?.type === 'value') {
       rhsStr = cond.rhs.value;
-    } else if (cond.rhs.type === 'variable') {
+    } else if (cond.rhs?.type === 'variable') {
       const rhsParams = Object.entries(cond.rhs.parameters || {})
         .map(([k, v]) => `${k}='${v}'`).join(', ');
       rhsStr = `${cond.rhs.name}(${rhsParams})`;
+    } else {
+      rhsStr = '/* missing_rhs */';
     }
 
-    code += `${pad}if (${lhsStr} ${cond.operator} ${rhsStr}) {\n`;
+    const lineConnector = (i > 0) ? ` ${connector} ` : '';
+    code += `${pad}${i > 0 ? lineConnector : ''}if ${lhsStr} ${cond.operator} ${rhsStr}:\n`;
 
     if (cond.children && cond.children.length > 0) {
-      code += renderPython(cond.children, indent + 1);
+      // default to nested AND unless you carry connector in your JSON
+      code += renderPython(cond.children, indent + 1, cond.connector || 'AND');
     } else {
-      code += `${'  '.repeat(indent + 1)}// action\n`;
+      code += `${'  '.repeat(indent + 1)}# action\n`;
     }
-
-    code += `${pad}}\n`;
   });
 
   return code;
 }
 
 
+
 function showPreview() {
-  const legs = document.querySelectorAll('.leg-block');
+  const legBlocks = document.querySelectorAll('.leg-block'); // ✅ DOM
   const jsonPreview = document.getElementById('jsonPreview');
   const pythonPreview = document.getElementById('pythonPreview');
   const previewBox = document.getElementById('jsonPreviewBox');
   const results = [];
   let python = '';
 
-legs.forEach((leg, idx) => {
+legBlocks.forEach((leg, idx) => {
     const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
     const exit = extractConditions(document.getElementById(`exit_conditions_${idx}`));
     results.push({ leg: idx + 1, entry_conditions: entry, exit_conditions: exit });
@@ -58,8 +59,8 @@ legs.forEach((leg, idx) => {
 }
 const form = document.getElementById("algoForm");
 form.addEventListener("submit", function(e) {
-  //const legs = document.querySelectorAll('.leg-block');
-  legs.forEach((leg, idx) => {
+  const legBlocks = document.querySelectorAll('.leg-block'); // ✅ DOM
+  legBlocks.forEach((leg, idx) => {
     const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
     const exit = extractConditions(document.getElementById(`exit_conditions_${idx}`));
     const entryInput = document.createElement('input');

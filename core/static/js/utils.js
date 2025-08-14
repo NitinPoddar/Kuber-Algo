@@ -1,9 +1,9 @@
-instruments         = window.instruments;
-indicators          = window.indicators;
-all_symbols         = window.all_symbols;
-
-userDefinedVariables  = window.userDefinedVariables || [];
-legs=window.legs
+// utils.js (top)
+const instruments          = window.instruments;
+const indicators           = window.indicators;
+const all_symbols          = window.all_symbols;
+let   userDefinedVariables = window.userDefinedVariables || [];
+const initialLegs          = Array.isArray(window.legs) ? window.legs : [];
 
 // if we’re in edit mode, user-vars-data was already rendered in the template
 
@@ -74,7 +74,7 @@ function getAllVariableOptionsHTML() {
   return html;
 }
 
-function buildVariableDropdown(index) {
+function buildVariableDropdown() {
   // Group indicators by category
   const grouped = {};
   indicators.forEach(v => {
@@ -121,4 +121,5 @@ function showStrategySection() {
     document.getElementById("fundError").style.display = fund ? "none" : "block";
   }
 }
+
 

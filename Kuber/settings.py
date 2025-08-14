@@ -86,7 +86,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-LOGIN_REDIRECT_URL = 'profile'  # or any named URL you want to land onafterlogin
+LOGIN_REDIRECT_URL = 'dashboard'  # or any named URL you want to land onafterlogin
 LOGOUT_REDIRECT_URL = 'login'   # optional: where to go after logout
 
 

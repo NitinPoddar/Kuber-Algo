@@ -51,7 +51,9 @@ SAFE_BUILTINS = {
     "hasattr": hasattr,        # if your code uses it
     "getattr": getattr,        # optional
     "callable": callable,      # optional
-    "type": type,    
+    "type": type,
+    "Exception": Exception,
+    "ValueError": ValueError,    
 }
 
 ALLOWED_MODULES = {
@@ -61,6 +63,8 @@ ALLOWED_MODULES = {
    "zoneinfo": __import__("zoneinfo"),
 }
 
+def _env_has_client(env):
+    return isinstance(env, dict) and env.get("client") is not None
 
 def _build_transport_env(env: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -162,9 +166,13 @@ def _run_in_thread(code_str, inputs, env):
         raise RuntimeError(f"{type(e).__name__}: {e}")
 
 def execute_user_code(code_str: str, inputs: Dict[str, Any], env: Dict[str, Any],
-                      timeout: float = SANDBOX_TIMEOUT_SECONDS) -> Any:
+                      timeout: float = SANDBOX_TIMEOUT_SECONDS,
+                      force_thread: bool | None = None) -> Any:
     # Force thread mode on Windows (avoid WinError 6 entirely)
-    if platform.system() == "Windows" or os.environ.get("SANDBOX_FORCE_THREAD") == "1":
+    if force_thread is None:
+        force_thread=_env_has_client(env)
+        
+    if force_thread or platform.system() == "Windows" or os.environ.get("SANDBOX_FORCE_THREAD") == "1":
         with ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(_run_in_thread, code_str, inputs, env)
             try:
