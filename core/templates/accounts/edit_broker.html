@@ -1,0 +1,125 @@
+{% extends "core/base.html" %}
+{% block content %}
+<section class="section">
+  <div class="container" style="max-width:860px">
+    <h1 class="title">Edit Broker</h1>
+
+    <div class="box">
+      <div class="columns is-multiline">
+        <div class="column is-half">
+          <label class="label">Broker Name</label>
+          <input class="input" id="broker_name" value="{{ broker.broker_name }}">
+        </div>
+        <div class="column is-half">
+          <label class="label">Adapter Path</label>
+          <input class="input" id="adapter_path" value="{{ broker.adapter_path }}">
+          <p class="help">e.g. <code>core.services.brokers.wisdom_xts.WisdomClient</code></p>
+        </div>
+        <div class="column is-full">
+          <label class="label">Root API</label>
+          <input class="input" id="root_api" value="{{ broker.root_api }}">
+        </div>
+        <div class="column is-half">
+          <label class="label">Server IP (optional)</label>
+          <input class="input" id="server_ip" value="{{ broker.server_ip }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2 class="subtitle">Exchange Mapping</h2>
+      <p class="help">Map each canonical exchange to this broker’s code + XTS segment (optional override).</p>
+      <table class="table is-striped is-fullwidth is-narrow" id="mapTable">
+        <thead><tr>
+          <th style="width:180px">Our Exchange</th>
+          <th>Broker Code</th>
+          <th style="width:180px">XTS Segment (int)</th>
+        </tr></thead>
+        <tbody><!-- filled by JS --></tbody>
+      </table>
+    </div>
+
+    <div class="is-flex is-justify-content-space-between is-align-items-center">
+      <div id="err" class="has-text-danger is-size-7" style="display:none;"></div>
+      <div>
+        <a class="button is-light" href="/environment/">Back</a>
+        <button class="button is-primary" id="saveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){for(const c of document.cookie.split(';')){const ck=c.trim();if(ck.startsWith(name+'=')){v=decodeURIComponent(ck.slice(name.length+1));break;}}}return v;}
+const csrftoken=getCookie('csrftoken');
+const brokerId = {{ broker.id }};
+
+let exchanges = [];
+let mappings  = []; // [{exchange_id, broker_code, xts_segment, exchange_key}]
+
+function rowHtml(ex){
+  const map = mappings.find(m => m.exchange_id === ex.id) || {};
+  const code = map.broker_code || '';
+  const seg  = (map.xts_segment ?? '');
+  return `<tr data-exid="${ex.id}">
+    <td><strong>${ex.key}</strong><br><small>${ex.name}</small></td>
+    <td><input class="input broker_code" placeholder="e.g. NSE / NFO / MCX" value="${code}"></td>
+    <td><input class="input xts_segment" type="number" placeholder="${ex.default_xts_segment ?? ''}" value="${seg}"></td>
+  </tr>`;
+}
+
+async function loadData(){
+  const [bro, exs] = await Promise.all([
+    fetch(`/api/broker/${brokerId}/`).then(r=>r.json()),
+    fetch(`/api/exchanges/`).then(r=>r.json())
+  ]);
+  if(!bro.success){ return showErr(bro.error || 'Failed to load broker'); }
+  if(!exs.success){ return showErr(exs.error || 'Failed to load exchanges'); }
+  mappings  = bro.mappings || [];
+  exchanges = exs.exchanges || [];
+  const tbody = document.querySelector('#mapTable tbody');
+  tbody.innerHTML = exchanges.map(rowHtml).join('');
+  // fill top fields
+  const b = bro.broker || {};
+  document.getElementById('broker_name').value = b.broker_name || '';
+  document.getElementById('adapter_path').value = b.adapter_path || '';
+  document.getElementById('root_api').value = b.root_api || '';
+  document.getElementById('server_ip').value = b.server_ip || '';
+}
+
+function collectPayload(){
+  const rows = [];
+  document.querySelectorAll('#mapTable tbody tr').forEach(tr=>{
+    const id = Number(tr.getAttribute('data-exid'));
+    const code = tr.querySelector('.broker_code').value.trim();
+    const segRaw = tr.querySelector('.xts_segment').value.trim();
+    const seg = segRaw === "" ? null : Number(segRaw);
+    if(code){ rows.push({exchange_id:id, broker_code:code, xts_segment:seg}); }
+  });
+  return {
+    broker_name: document.getElementById('broker_name').value.trim(),
+    adapter_path: document.getElementById('adapter_path').value.trim(),
+    root_api: document.getElementById('root_api').value.trim(),
+    server_ip: document.getElementById('server_ip').value.trim(),
+    mappings: rows
+  };
+}
+
+function showErr(msg){const el=document.getElementById('err'); el.textContent=msg; el.style.display='block';}
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const payload = collectPayload();
+  try{
+    const res = await fetch(`/api/broker/${brokerId}/`, {
+      method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrftoken},
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if(d && d.success){ location.reload(); }
+    else { showErr((d && d.error) || 'Failed to save'); }
+  }catch(e){ showErr(e.message || 'Failed to save'); }
+});
+
+loadData();
+</script>
+{% endblock %}

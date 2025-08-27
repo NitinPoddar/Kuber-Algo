@@ -2,6 +2,8 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Optional, Type
 from .base import BrokerClient
+# re-export helpers so adapters can do: from core.services.brokers.router import resolve_xts_segment_for_account
+from .exchanges import resolve_broker_code_and_segment, resolve_xts_segment_for_account
 
 def _import_adapter(path: str) -> Optional[Type[BrokerClient]]:
     if not path:

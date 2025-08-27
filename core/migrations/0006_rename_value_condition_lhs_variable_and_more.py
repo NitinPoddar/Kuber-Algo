@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='condition',
             name='rhs_type',
-            field=models.CharField(choices=[('value', 'Value'), ('variable', 'Variable')], default=datetime.datetime(2025, 8, 3, 7, 15, 44, 274062, tzinfo=datetime.timezone.utc), max_length=10),
+            field=models.CharField(choices=[('value', 'Value'), ('variable', 'Variable')], default='value',max_length=10),
             preserve_default=False,
         ),
         migrations.AddField(

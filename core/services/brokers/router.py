@@ -6,6 +6,8 @@ from functools import lru_cache
 
 from .base import BrokerClient
 from .paper import PaperClient  # keep paper client import here
+# re-export helpers so adapters can do: from core.services.brokers.router import resolve_xts_segment_for_account
+from .exchanges import resolve_broker_code_and_segment, resolve_xts_segment_for_account
 
 # Optional: legacy fallback mapping by substring in broker_name
 _FALLBACK_MAP = {

@@ -123,8 +123,8 @@ function addUserDefinedVariable() {
       <div class="is-flex is-align-items-center">
         <span id="constant_status_${index}" class="icon is-small mr-2"></span>
         <button type="button" class="delete" 
-+              onclick="this.closest('.box').remove()">
-+      </button>
+              onclick="this.closest('.box').remove()">
+      </button>
       </div>
     </div>
 
@@ -591,7 +591,7 @@ if (hiddenInput) {
   // Update global registry
   userDefinedVariables = userDefinedVariables.filter(v => v.name !== originalName);
   userDefinedVariables.push({ name, expression });
-
+document.dispatchEvent(new CustomEvent('udv:changed', { detail: { action: 'save', name } }));
   // Update dropdowns
  // 🆕 Update all dropdowns with the latest user-defined variable list
 const allDropdowns = document.querySelectorAll('.inline-variable-dropdown');
@@ -607,6 +607,8 @@ allDropdowns.forEach(dd => {
   // Track saved name
   nameInput.setAttribute("data-original", name);
 }
+
+
 function ensureSaveButton(index) {
   const box = document.getElementById(`user_constant_box_${index}`);
   if (!box) return;
@@ -950,6 +952,7 @@ function removeUserConstant(index) {
 
   // --- 4) Update global registry
   userDefinedVariables = (userDefinedVariables || []).filter(v => v.name !== name);
+document.dispatchEvent(new CustomEvent('udv:changed', { detail: { action: 'save', name } }));
 
   // --- 5) Refresh EVERY variable dropdown using your helper
   document.querySelectorAll('.inline-variable-dropdown, .condition-variable, .rhs-variable-dropdown')
@@ -1027,6 +1030,7 @@ function preloadUserDefinedVariables() {
         }
       });
   });
+  document.dispatchEvent(new CustomEvent('udv:changed', { detail: { source: 'preload' } }));
 }
 
 function formatExpressionText(expression) {

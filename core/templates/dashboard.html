@@ -1,283 +1,727 @@
 {% extends 'core/base.html' %}
 {% load static %}
-
 {% block content %}
+
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+      referrerpolicy="no-referrer">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+  .k-toolbar{ position: sticky; top: 64px; z-index: 8; }
+  .k-card{ border:1px solid var(--line); border-radius:12px; box-shadow: var(--shadow); }
+  .k-dot{ width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:.5rem; }
+  .k-dot.running{ background: var(--success); box-shadow:0 0 0 3px rgba(16,185,129,.18); }
+  .k-dot.paused{ background: var(--warning); }
+  .k-dot.error{ background: var(--danger); }
+  .k-dot.live_ready,.k-dot.paper_ready,.k-dot.unregistered{ background: var(--muted); }
+  .k-planpill{ border:1px dashed var(--line); border-radius:999px; padding:.2rem .6rem; font-size:.85rem; background:var(--soft); }
+  .k-logs{ background:#0b1020; color:#d1e7ff; padding:12px; border-radius:10px; max-height:55vh; overflow:auto; }
+  .k-skel{ animation:kPulse 1.3s infinite ease-in-out; background:#e5e7eb; height:12px; border-radius:8px; }
+  @keyframes kPulse{ 0%{opacity:.5} 50%{opacity:.9} 100%{opacity:.5} }
+  .k-empty{ opacity:.7; }
+</style>
+
 <section class="section">
   <div class="container">
-    <div class="is-flex is-justify-content-space-between is-align-items-center">
-      <h1 class="title">Your Algorithms</h1>
-      <div>
-        <div class="select is-small">
-          <select id="statusFilter">
-            <option value="">All</option>
-            <option value="unregistered">Unregistered</option>
-            <option value="paper_ready">Paper Ready</option>
-            <option value="live_ready">Live Ready</option>
-            <option value="running">Running</option>
-            <option value="paused">Paused</option>
-            <option value="error">Error</option>
-          </select>
-        </div>
-        <button class="button is-small ml-2" id="reloadBtn">Reload</button>
+
+    <!-- Header -->
+    <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+      <h1 class="title">Dashboard</h1>
+      <div class="buttons">
+        <a class="button is-light" href="{% url 'marketplace' %}">Marketplace</a>
+        <button class="button is-primary" id="btnRefresh">Refresh</button>
       </div>
     </div>
 
-    <div id="algoGrid" class="columns is-multiline"></div>
+    <!-- KPI overview (visible set) -->
+    <div class="columns is-variable is-3">
+      <div class="column">
+        <div class="box">
+          <p class="is-size-7 has-text-grey">Today PnL</p>
+          <p class="is-size-3 has-text-weight-bold" id="kpiToday">—</p>
+        </div>
+      </div>
+      <div class="column">
+        <div class="box">
+          <p class="is-size-7 has-text-grey">MTD PnL</p>
+          <p class="is-size-3 has-text-weight-bold" id="kpiMtd">—</p>
+        </div>
+      </div>
+      <div class="column">
+        <div class="box">
+          <p class="is-size-7 has-text-grey">Total PnL</p>
+          <p class="is-size-3 has-text-weight-bold" id="kpiTotal">—</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="box k-toolbar mb-5">
+      <div class="is-flex is-flex-wrap-wrap is-align-items-center" style="gap:.75rem 1rem;">
+        <div class="control has-icons-left">
+          <input class="input" id="searchInput" placeholder="Search algos…"/>
+          <span class="icon is-left"><i class="fas fa-search"></i></span>
+        </div>
+        <div class="select">
+          <select id="statusFilter">
+            <option value="all">All statuses</option>
+            <option value="running">Running</option>
+            <option value="paused">Paused</option>
+            <option value="error">Error</option>
+            <option value="live_ready">Live-ready</option>
+            <option value="paper_ready">Paper-ready</option>
+            <option value="unregistered">Unregistered</option>
+          </select>
+        </div>
+        <div class="select">
+          <select id="sortBy">
+            <option value="name">Sort: Name</option>
+            <option value="today">Sort: Today PnL</option>
+            <option value="mtd">Sort: MTD PnL</option>
+            <option value="total">Sort: Total PnL</option>
+            <option value="status">Sort: Status</option>
+          </select>
+        </div>
+        <div class="select">
+          <select id="visibilityFilter">
+            <option value="visible">Visible</option>
+            <option value="all">All (incl. hidden)</option>
+            <option value="hidden">Hidden only</option>
+          </select>
+        </div>
+        <label class="checkbox ml-2">
+          <input type="checkbox" id="autoRefresh" checked>
+          Auto refresh
+        </label>
+        <div class="is-flex-grow-1"></div>
+        <button class="button" id="btnHiddenMgr" title="Review & unhide any algos you’ve hidden from the dashboard">Manage Hidden</button>
+      </div>
+    </div>
+
+    <!-- Your Algos -->
+    <div class="is-flex is-align-items-center mb-2">
+      <h2 class="title is-5 mb-0">Your Algos</h2>
+      <span class="tag is-light ml-2" id="countMine">0</span>
+    </div>
+    <div id="userGrid" class="columns is-multiline"></div>
+    <div id="userEmpty" class="notification is-light k-empty is-hidden">No algos to show in this section.</div>
+
+    <!-- Admin / Global Algos -->
+    <div class="is-flex is-align-items-center mt-6 mb-2">
+      <h2 class="title is-5 mb-0">Admin / Global Algos</h2>
+      <span class="tag is-light ml-2" id="countAdmin">0</span>
+    </div>
+    <div id="adminGrid" class="columns is-multiline"></div>
+    <div id="adminEmpty" class="notification is-light k-empty is-hidden">No algos to show in this section.</div>
+
   </div>
 </section>
 
-<!-- Register/Link Modal -->
-<div class="modal" id="registerModal">
+<!-- Logs Modal -->
+<div class="modal" id="logsModal">
   <div class="modal-background"></div>
-  <div class="modal-card" style="width:520px;">
+  <div class="modal-card" style="width:900px;max-width:95vw;">
     <header class="modal-card-head">
-      <p class="modal-card-title">Register / Link Account</p>
-      <button class="delete" aria-label="close" onclick="closeRegModal()"></button>
+      <p class="modal-card-title">Recent Logs</p>
+      <button class="delete" aria-label="close" data-close="#logsModal"></button>
     </header>
     <section class="modal-card-body">
-      <input type="hidden" id="regAlgoId">
-      <div class="field">
-        <label class="label">Choose Account</label>
-        <div class="select is-fullwidth">
-          <select id="regAccount"></select>
+      <pre id="logsBox" class="k-logs"></pre>
+    </section>
+  </div>
+</div>
+
+<!-- Performance Modal -->
+<div class="modal" id="perfModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:920px;max-width:95vw;">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="perfTitle">Performance</p>
+      <button class="delete" aria-label="close" data-close="#perfModal"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="columns">
+        <div class="column is-8">
+          <canvas id="perfChart" height="140"></canvas>
         </div>
-        <p class="help">
-  <a href="{% url 'broker-account-create' %}?next={{ request.path|urlencode }}" target="_blank">Add a broker account</a>
-  · <a href="#" id="reloadAccounts">Reload list</a>
-</p>
+        <div class="column is-4">
+          <div class="box">
+            <p><strong>Sharpe</strong>: <span id="pSharpe">—</span></p>
+            <p><strong>Max Drawdown</strong>: <span id="pMdd">—</span></p>
+            <p><strong>Win Rate</strong>: <span id="pWin">—</span></p>
+            <p><strong>CAGR</strong>: <span id="pCagr">—</span></p>
+          </div>
+          <p class="is-size-7 has-text-grey">Endpoint: <code>/api/algo/performance?algo_id=&lt;id&gt;</code></p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Register Modal -->
+<div class="modal" id="registerModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:560px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Register Algo</p>
+      <button class="delete" aria-label="close" data-close="#registerModal"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Linked account</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="regAccount"></select>
+          </div>
+        </div>
+        <p class="help">Pick the broker account to link with this algo.</p>
       </div>
       <div class="field">
         <label class="label">Role</label>
-        <div class="select is-fullwidth">
-          <select id="regRole">
-            <option value="primary">Primary (Live)</option>
-            <option value="hedge">Hedge (Live)</option>
-            <option value="paper">Paper</option>
-          </select>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="regRole">
+              <option value="paper">Paper (simulation)</option>
+              <option value="primary">Primary (live)</option>
+              <option value="hedge">Hedge (live)</option>
+            </select>
+          </div>
         </div>
       </div>
-      <label class="checkbox"><input type="checkbox" id="regDefault"> Set as default (ignored for paper)</label>
-      <p class="help is-danger mt-2" id="regErr" style="display:none;"></p>
+      <div class="is-hidden" id="regAlgoId"></div>
+      <div class="is-size-7 has-text-grey">Tip: You can change defaults later from Environment & Links.</div>
     </section>
-    <footer class="modal-card-foot is-justify-content-space-between">
-      <div>
-        <button class="button is-primary" onclick="submitRegister()">Save</button>
-        <button class="button" onclick="closeRegModal()">Cancel</button>
-      </div>
+    <footer class="modal-card-foot is-justify-content-flex-end">
+      <button class="button" data-close="#registerModal">Cancel</button>
+      <button class="button is-primary" id="btnDoRegister">Register</button>
     </footer>
   </div>
 </div>
 
-<style>
-.card-status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
-.kpi-chip{display:inline-block;padding:2px 8px;border-radius:999px;background:#f5f5f5;margin-right:6px}
-.logbox{max-height:160px;overflow:auto;background:#fafafa;border:1px solid #eee;border-radius:6px;padding:8px}
-.logline{font-size:12px;white-space:pre-wrap;margin-bottom:4px}
-.log-INFO{color:#363636} .log-WARN{color:#b58900} .log-ERROR{color:#cc0000} .log-DEBUG{color:#6a737d}
-</style>
+<!-- Hidden Manager Modal -->
+<div class="modal" id="hiddenModal">
+  <div class="modal-background"></div>
+  <div class="modal-card" style="width:560px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Hidden Algos</p>
+      <button class="delete" aria-label="close" data-close="#hiddenModal"></button>
+    </header>
+    <section class="modal-card-body">
+      <div id="hiddenList"></div>
+      <p class="is-size-7 has-text-grey mt-3">Hidden algos simply don’t render on this dashboard. They continue to run and log as usual.</p>
+    </section>
+  </div>
+</div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// ---- CSRF ----
-function getCookie(name){let v=null;if(document.cookie&&document.cookie!==''){const c=document.cookie.split(';');for(let i=0;i<c.length;i++){const ck=c[i].trim();if(ck.substring(0,name.length+1)===(name+'=')){v=decodeURIComponent(ck.substring(name.length+1));break;}}}return v}
-const csrftoken=getCookie('csrftoken');
-$.ajaxSetup({beforeSend:function(xhr,s){if(!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(s.type)){xhr.setRequestHeader("X-CSRFToken",csrftoken);}}});
+(function(){
+  // === USER CONTEXT ===
+  window.CURRENT_USER_ID =
+    {% if request and request.user and request.user.is_authenticated %}
+      {{ request.user.id }}
+    {% else %}
+      null
+    {% endif %};
 
-let cardsCache = [];
-let STATUS_STYLES = {}; // filled from API
+  // === CSRF ===
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : null;
+  }
+  const CSRF = getCookie('csrftoken');
 
-// ---- Styles (server-configurable, with fallbacks) ----
-function fetchStatusStyles(cb){
-  $.get('/api/dashboard/status_styles/', function(d){
-    if(d && d.success) STATUS_STYLES = d.styles || {};
-    if (cb) cb();
-  });
-}
-function statusBgClass(status){
-  return (STATUS_STYLES[status] && STATUS_STYLES[status].bulma_bg_class) || 'has-background-light';
-}
-function statusTagClass(status){
-  return (STATUS_STYLES[status] && STATUS_STYLES[status].bulma_tag_class) || 'is-light';
-}
-function statusDotStyle(status){
-  const hex = STATUS_STYLES[status]?.dot_hex;
-  return hex ? `style="background:${hex}"` : '';
-}
-function statusLabel(status){
-  return (STATUS_STYLES[status] && STATUS_STYLES[status].label) || status.replace('_',' ');
-}
+  async function fetchJSON(url, opts={}){
+    const finalOpts = {credentials:'same-origin', ...opts};
+    finalOpts.headers = {'Accept':'application/json', ...(opts.headers||{})};
+    const method = (finalOpts.method || 'GET').toUpperCase();
+    if (['POST','PUT','PATCH','DELETE'].includes(method)){
+      finalOpts.headers['X-CSRFToken'] = CSRF || '';
+      if (!finalOpts.headers['Content-Type'] && !(finalOpts.body instanceof FormData)){
+        finalOpts.headers['Content-Type'] = 'application/json';
+      }
+    }
+    const res = await fetch(url, finalOpts);
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : {}; } catch(e){}
+    if (!res.ok){
+      const msg = (data && (data.error || data.detail)) || text || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return data ?? {};
+  }
 
-// ---- Cards render ----
-function renderCards(list){
-  const filter = $('#statusFilter').val();
-  let html='';
-  (list||[]).filter(a=>!filter || a.status===filter).forEach(a=>{
-    const bgClass = statusBgClass(a.status);
-    const tagClass = statusTagClass(a.status);
-    const dotStyle = statusDotStyle(a.status);
-    const label = statusLabel(a.status);
+  // === STATE ===
+  let ALGOS = [];
+  let POLL = null;
+  let chart = null;
+  let HSET = new Set(JSON.parse(localStorage.getItem('hidden_algos_v2')||'[]'));
 
-    html += `
-      <div class="column is-one-quarter">
-        <div class="card">
+  // === DOM helpers ===
+  const $  = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const fmt = n => (n==null?'—':Number(n).toLocaleString());
+
+  function toast(msg, type='is-info'){
+    const n = document.createElement('div');
+    n.className = `notification ${type}`;
+    n.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:1000';
+    n.textContent = msg;
+    document.body.appendChild(n);
+    setTimeout(()=>n.remove(),2200);
+  }
+
+  // === UI skeleton ===
+  function skelCard(){ return `
+    <div class="column is-one-quarter">
+      <div class="card k-card">
+        <div class="card-header"><p class="card-header-title"><span class="k-skel" style="width:60%"></span></p></div>
+        <div class="card-content">
+          <div class="k-skel" style="width:80%"></div>
+          <div class="k-skel" style="width:60%; margin-top:8px;"></div>
+          <div class="k-skel" style="width:40%; margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>`;}
+
+  // === Classification ===
+  function isMine(a){
+    const uid = window.CURRENT_USER_ID;
+    if (a.is_owned === true) return true;
+    if (a.owner_id && uid && a.owner_id === uid) return true;
+    if (a.created_by_id && uid && a.created_by_id === uid) return true;
+    if (a.has_live || a.has_paper) return true;
+    const k = a.kpis || {};
+    if ((k.today_pnl||0)!==0 || (k.mtd_pnl||0)!==0 || (k.total_pnl||0)!==0) return true;
+    return false;
+  }
+  function statusCls(s){ s=(s||'').toLowerCase(); return ['running','paused','error','live_ready','paper_ready','unregistered'].includes(s)?s:'unregistered'; }
+
+  // === Load algos ===
+  async function loadAlgos(){
+    $('#userGrid').innerHTML = skelCard()+skelCard();
+    $('#adminGrid').innerHTML = skelCard()+skelCard();
+    try{
+      const d = await fetchJSON('/api/dashboard_algos/');
+      if(!d.success) throw new Error(d.error || 'Failed');
+      ALGOS = d.algos || [];
+      renderAll();
+    }catch(e){
+      toast(`Failed to load algos: ${e.message}`, 'is-danger');
+      $('#userGrid').innerHTML = '';
+      $('#adminGrid').innerHTML = '';
+    }
+  }
+
+  // === Filters ===
+  function applyFilters(list){
+    const q   = ($('#searchInput').value||'').toLowerCase();
+    const st  = ($('#statusFilter').value||'all').toLowerCase();
+    const vis = ($('#visibilityFilter').value||'visible').toLowerCase();
+
+    let arr = list
+      .filter(a => !q || (a.algo_name||'').toLowerCase().includes(q))
+      .filter(a => st==='all' || (String(a.status||'').toLowerCase()===st));
+
+    arr = arr.filter(a=>{
+      const hidden = HSET.has(String(a.algo_id));
+      if (vis==='hidden') return hidden;
+      if (vis==='visible') return !hidden;
+      return true;
+    });
+
+    switch($('#sortBy').value){
+      case 'today': arr.sort((a,b)=> (b.kpis.today_pnl - a.kpis.today_pnl)); break;
+      case 'mtd':   arr.sort((a,b)=> (b.kpis.mtd_pnl   - a.kpis.mtd_pnl));   break;
+      case 'total': arr.sort((a,b)=> (b.kpis.total_pnl - a.kpis.total_pnl)); break;
+      case 'status':arr.sort((a,b)=> String(a.status).localeCompare(String(b.status))); break;
+      default:      arr.sort((a,b)=> String(a.algo_name).localeCompare(String(b.algo_name)));
+    }
+    return arr;
+  }
+
+  // === Render ===
+  function renderAll(){
+    const mine  = applyFilters(ALGOS.filter(isMine));
+    const admin = applyFilters(ALGOS.filter(a=>!isMine(a)));
+
+    $('#countMine').textContent  = mine.length;
+    $('#countAdmin').textContent = admin.length;
+
+    renderGrid('#userGrid', mine);
+    renderGrid('#adminGrid', admin);
+
+    $('#userEmpty').classList.toggle('is-hidden', !!mine.length);
+    $('#adminEmpty').classList.toggle('is-hidden', !!admin.length);
+
+    const vis = applyFilters(ALGOS);
+    const agg = vis.reduce((acc,a)=>{
+      acc.today += a.kpis?.today_pnl || 0;
+      acc.mtd   += a.kpis?.mtd_pnl   || 0;
+      acc.total += a.kpis?.total_pnl || 0;
+      return acc;
+    }, {today:0,mtd:0,total:0});
+    $('#kpiToday').textContent = fmt(agg.today);
+    $('#kpiMtd').textContent   = fmt(agg.mtd);
+    $('#kpiTotal').textContent = fmt(agg.total);
+  }
+
+  function buildButtons(a){
+    const s = (a.status||'').toLowerCase();
+    const buttons = [];
+
+    // Marketplace action for user-owned algos
+    const mine = isMine(a);
+    if (mine){
+      buttons.push(`<a class="button is-info is-light"
+                       href="{% url 'marketplace' %}?algo_id=${a.algo_id}"
+                       title="Create or manage marketplace listing for this algo">
+                      <i class="fa-solid fa-store"></i>&nbsp;Market
+                    </a>`);
+    }
+
+    // Registration vs controls
+    if (s === 'unregistered'){
+      buttons.push(`<button class="button is-primary"
+                            data-register="${a.algo_id}"
+                            title="Link a broker account to enable running in paper or live mode">
+                      <i class="fa-solid fa-plug"></i>&nbsp;Register
+                    </button>`);
+      // No other buttons when unregistered (clean)
+      return buttons.join('');
+    }
+
+    // RUN / PAUSE / STOP logic — only show if applicable (hide otherwise)
+    if (s === 'paused' || s === 'stopped' || s === 'paper_ready' || s === 'live_ready'){
+      if (a.has_live){
+        buttons.push(`<button class="button is-success is-light"
+                              data-run="${a.algo_id}" data-mode="live"
+                              title="Start the algo in LIVE mode (sends real orders)">
+                        <i class="fa-solid fa-play"></i>&nbsp;Run Live
+                      </button>`);
+      }
+      if (a.has_paper){
+        buttons.push(`<button class="button is-link is-light"
+                              data-run="${a.algo_id}" data-mode="paper"
+                              title="Start the algo in PAPER mode (no real orders)">
+                        <i class="fa-regular fa-circle-play"></i>&nbsp;Run Paper
+                      </button>`);
+      }
+    }
+    if (s === 'running'){
+      buttons.push(`<button class="button is-warning is-light"
+                            data-pause="${a.algo_id}" data-mode="${a.run_mode||'paper'}"
+                            title="Pause temporarily and preserve state; you can resume quickly">
+                      <i class="fa-solid fa-circle-pause"></i>&nbsp;Pause
+                    </button>`);
+      buttons.push(`<button class="button is-danger is-light"
+                            data-stop="${a.algo_id}" data-mode="${a.run_mode||'paper'}"
+                            title="Hard stop: terminate session and clear runtime state">
+                      <i class="fa-solid fa-stop"></i>&nbsp;Stop
+                    </button>`);
+    } else if (s === 'paused'){
+      buttons.push(`<button class="button is-success is-light"
+                            data-run="${a.algo_id}" data-mode="${a.run_mode||'paper'}"
+                            title="Resume from where it was paused">
+                      <i class="fa-solid fa-play"></i>&nbsp;Resume
+                    </button>`);
+      buttons.push(`<button class="button is-danger is-light"
+                            data-stop="${a.algo_id}" data-mode="${a.run_mode||'paper'}"
+                            title="Terminate the paused session and clear runtime state">
+                      <i class="fa-solid fa-stop"></i>&nbsp;Stop
+                    </button>`);
+    } else if (s === 'error'){
+      // Suggest stopping to reset, or re-run
+      if (a.has_paper || a.has_live){
+        buttons.push(`<button class="button is-danger is-light"
+                              data-stop="${a.algo_id}" data-mode="${a.run_mode||'paper'}"
+                              title="Stop to reset the errored session">
+                        <i class="fa-solid fa-stop"></i>&nbsp;Stop
+                      </button>`);
+        buttons.push(`<button class="button is-link is-light"
+                              data-run="${a.algo_id}" data-mode="${a.run_mode||'paper'}"
+                              title="Try running again after an error">
+                        <i class="fa-solid fa-rotate-right"></i>&nbsp;Re-run
+                      </button>`);
+      }
+    }
+
+    // Logs / Performance are always useful
+    buttons.push(`<button class="button is-light"
+                          data-logs="${a.algo_id}"
+                          title="View the most recent execution logs">
+                    <i class="fa-solid fa-list"></i>&nbsp;Logs
+                  </button>`);
+    buttons.push(`<button class="button is-light"
+                          data-perf="${a.algo_id}" data-name="${a.algo_name}"
+                          title="Open performance chart and statistics">
+                    <i class="fa-solid fa-chart-line"></i>&nbsp;Performance
+                  </button>`);
+
+    // Hide/Unhide
+    const hidden = HSET.has(String(a.algo_id));
+    buttons.push(`<button class="button ${hidden?'is-dark':'is-light'}"
+                          data-togglehide="${a.algo_id}"
+                          title="${hidden ? 'Show this algo on dashboard again' : 'Hide this algo from the dashboard'}">
+                    <i class="fa-solid fa-eye${hidden? '' : '-slash'}"></i>&nbsp;${hidden?'Unhide':'Hide'}
+                  </button>`);
+
+    return buttons.join('');
+  }
+
+  function renderGrid(sel, list){
+    const box = $(sel); box.innerHTML = '';
+    list.forEach(a=>{
+      const s = statusCls(a.status);
+      const col = document.createElement('div');
+      col.className = 'column is-one-quarter';
+      col.innerHTML = `
+        <div class="card k-card">
           <header class="card-header">
-            <p class="card-header-title">
-              <span class="card-status-dot" ${dotStyle}></span>
-              ${a.algo_name}
+            <p class="card-header-title" title="Status: ${(a.status||'').toUpperCase()}">
+              <span class="k-dot ${s}"></span>${a.algo_name}
             </p>
-            <p class="card-header-icon">
-              <span class="tag ${tagClass}">${label}</span>
-            </p>
+            <p class="card-header-icon"><span class="tag">${(a.status||'').toUpperCase()}</span></p>
           </header>
-
-          <div class="card-content ${bgClass}">
-            <div class="content">
-              <div class="mb-2">
-                <span class="kpi-chip">Today: <strong>${a.kpis.today_pnl}</strong></span>
-                <span class="kpi-chip">MTD: <strong>${a.kpis.mtd_pnl}</strong></span>
-                <span class="kpi-chip">Total: <strong>${a.kpis.total_pnl}</strong></span>
-              </div>
-
-              <div class="buttons are-small">
-                ${a.status==='unregistered' ? `
-                  <button class="button is-link is-light btn-register" data-algo="${a.algo_id}">Register</button>
-                  <button class="button is-info is-light btn-register-paper" data-algo="${a.algo_id}">Paper</button>
-                ` : `
-                  <button class="button is-success is-light btn-run" data-mode="live" data-algo="${a.algo_id}" ${a.has_live?'':'disabled'}>Run Live</button>
-                  <button class="button is-link is-light btn-run" data-mode="paper" data-algo="${a.algo_id}" ${a.has_paper?'':'disabled'}>Run Paper</button>
-                  <button class="button is-warning is-light btn-pause" data-algo="${a.algo_id}" ${a.status==='running'?'':'disabled'}>Pause</button>
-                  <button class="button is-danger is-light btn-stop" data-algo="${a.algo_id}">Stop</button>
-                `}
-                <button class="button is-light btn-logs" data-algo="${a.algo_id}">Logs</button>
-              </div>
-
-              <div class="mt-2 is-size-7 has-text-grey">
-                Last heartbeat: ${a.last_heartbeat || '—'}
-              </div>
-
-              <div class="logbox mt-3 is-hidden" id="logbox-${a.algo_id}">
-                <div class="is-size-7 has-text-grey mb-1">Recent logs</div>
-                <div id="logs-${a.algo_id}"></div>
-              </div>
+          <div class="card-content">
+            <div class="mb-2">
+              <span class="k-planpill" title="Sum of all realized PnL for today">Today: <b>${fmt(a.kpis.today_pnl)}</b></span>
+              <span class="k-planpill" title="Month-to-date PnL">MTD: <b>${fmt(a.kpis.mtd_pnl)}</b></span>
+              <span class="k-planpill" title="Cumulative PnL for this algo">Total: <b>${fmt(a.kpis.total_pnl)}</b></span>
+            </div>
+            <div class="buttons">
+              ${buildButtons(a)}
+            </div>
+            <div class="is-size-7 has-text-grey mt-1" title="Last heartbeat from the running worker">
+              Heartbeat: ${a.last_heartbeat ? new Date(a.last_heartbeat).toLocaleString() : '—'}
             </div>
           </div>
-        </div>
-      </div>`;
-  });
-  $('#algoGrid').html(html);
-}
+        </div>`;
+      box.appendChild(col);
+    });
+  }
 
-// ---- Data loads & actions ----
-function loadDashboard(){
-  $.get('/api/dashboard/algos/', function(d){
-    if(!d.success) return;
-    cardsCache = d.algos || [];
-    renderCards(cardsCache);
-  });
-}
+  // === Hidden helpers ===
+  function applyHiddenLocal(id, hide){
+    if(hide) HSET.add(id); else HSET.delete(id);
+    localStorage.setItem('hidden_algos_v2', JSON.stringify(Array.from(HSET)));
+    renderAll();
+    toast(hide?'Hidden':'Unhidden');
+  }
+  function buildHiddenList(){
+    const ids = Array.from(HSET);
+    const map = new Map(ALGOS.map(a=>[String(a.algo_id), a.algo_name]));
+    const box = $('#hiddenList');
+    if(!ids.length){ box.innerHTML = '<div class="notification is-light">Nothing is hidden.</div>'; return; }
+    box.innerHTML = ids.map(id=>`
+      <div class="is-flex is-justify-content-space-between is-align-items-center box" style="padding:.75rem 1rem;">
+        <div>${map.get(id) || ('Algo #' + id)}</div>
+        <button class="button is-small" data-unhide="${id}" title="Unhide this algo">Unhide</button>
+      </div>`).join('');
+  }
 
-function openRegModal(algoId, role){
-  $('#regAlgoId').val(algoId);
-  $('#regRole').val(role || 'primary');
-  $('#regDefault').prop('checked', role!=='paper');
-  $('#regErr').hide().text('');
+  // === Performance ===
+  function showPerf(d){
+    if(chart){ chart.destroy(); chart=null; }
+    const ctx = $('#perfChart').getContext('2d');
 
-  $.get('/api/env/accounts/', function(d){
-    if(!d.success) return;
-    const accounts = d.accounts || [];
-    if (accounts.length === 0) {
-      const addUrl = "{% url 'broker-account-create' %}?next={{ request.path|urlencode }}";
-      window.open(addUrl, '_blank');
-      $('#regErr').text('No broker accounts yet. Add one, then click "Reload list".').show();
+    if(!d || !Array.isArray(d.series) || d.series.length===0){
+      $('#pSharpe').textContent='—'; $('#pMdd').textContent='—'; $('#pWin').textContent='—'; $('#pCagr').textContent='—';
+      chart = new Chart(ctx,{ type:'line', data:{labels:[], datasets:[{data:[]}]}, options:{plugins:{legend:{display:false}}} });
+      return;
     }
-    const opts = accounts.map(a=>`<option value="${a.id}">${a.label} (${a.broker_name})</option>`).join('');
-    $('#regAccount').html(opts);
-    $('#registerModal').addClass('is-active');
-  });
-}
+    $('#pSharpe').textContent = d.sharpe!=null ? d.sharpe.toFixed(2) : '—';
+    $('#pMdd').textContent    = d.mdd!=null    ? (d.mdd*100).toFixed(1)+'%' : '—';
+    $('#pWin').textContent    = d.win_rate!=null? (d.win_rate*100).toFixed(1)+'%' : '—';
+    $('#pCagr').textContent   = d.cagr!=null   ? (d.cagr*100).toFixed(1)+'%' : '—';
 
-$(function(){
-  // ...
-  $(document).on('click', '#reloadAccounts', function(e){
-    e.preventDefault();
-    $.get('/api/env/accounts/', function(d){
-      if(!d.success) return;
-      const opts = (d.accounts||[]).map(a=>`<option value="${a.id}">${a.label} (${a.broker_name})</option>`).join('');
-      $('#regAccount').html(opts);
-      $('#regErr').hide().text('');
+    const labels = d.series.map(x=>x.date);
+    const equity = d.series.reduce((acc,x)=>{ acc.push((acc.at(-1)||0)+Number(x.pnl||0)); return acc; },[]);
+    chart = new Chart(ctx,{
+      type:'line',
+      data:{ labels, datasets:[{ data: equity, tension:.25 }]},
+      options:{ scales:{x:{display:false}}, plugins:{ legend:{ display:false } } }
     });
-  });
-});
+  }
 
-function closeRegModal(){ $('#registerModal').removeClass('is-active'); }
+  // === Register Modal helpers ===
+  async function openRegisterModal(algoId){
+    $('#regAlgoId').textContent = String(algoId);
+    // load accounts
+    try{
+      const res = await fetchJSON('/api/env/accounts/');
+      const sel = $('#regAccount');
+      sel.innerHTML = '';
+      (res.accounts || []).forEach(a=>{
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = `${a.label} — ${a.broker_name}`;
+        sel.appendChild(opt);
+      });
+      if (!sel.options.length){
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No accounts found. Add one in Environment.';
+        sel.appendChild(opt);
+      }
+      $('#registerModal').classList.add('is-active');
+    }catch(e){
+      toast(`Failed to load accounts: ${e.message}`, 'is-danger');
+    }
+  }
 
-function submitRegister(){
-  const algo = $('#regAlgoId').val();
-  const payload = {
-    account_id: $('#regAccount').val(),
-    role: $('#regRole').val(),
-    is_default: $('#regDefault').is(':checked')
-  };
-  $.ajax({
-    url: `/api/dashboard/${algo}/register/`,
-    method: 'POST',
-    contentType: 'application/json',
-    data: JSON.stringify(payload)
-  }).done(d=>{
-    if(d.success){ closeRegModal(); loadDashboard(); }
-    else { $('#regErr').text(d.error||'Failed').show(); }
-  });
-}
+  async function doRegister(){
+    const algoId = Number($('#regAlgoId').textContent || 0);
+    const account_id = Number($('#regAccount').value || 0);
+    const role = $('#regRole').value || 'paper';
+    if(!algoId || !account_id){
+      toast('Please pick an account.', 'is-warning'); return;
+    }
+    try{
+      await fetchJSON(`/api/dashboard/${algoId}/register/`, {
+        method:'POST',
+        body: JSON.stringify({ account_id, role, is_default: true })
+      });
+      toast('Registered');
+      $('#registerModal').classList.remove('is-active');
+      loadAlgos();
+    }catch(e){
+      toast(`Register failed: ${e.message}`, 'is-danger');
+    }
+  }
 
-function fetchLogs(algoId, mode='paper'){
-  $.get(`/api/dashboard/${algoId}/logs/?mode=${encodeURIComponent(mode)}&limit=50`, function(d){
-    if(!d.success) return;
-    const box = $(`#logbox-${algoId}`); box.removeClass('is-hidden');
-    const ct = $(`#logs-${algoId}`); ct.empty();
-    d.logs.forEach(row=>{
-      ct.append(`<div class="logline log-${row.level}">[${row.level}] ${row.ts} — ${row.message}</div>`);
-    });
-  });
-}
+  // === Actions ===
+  document.addEventListener('click', async function(e){
+    const t = e.target.closest('button, a, [data-close]');
+    if(!t) return;
 
-// ---- Wiring ----
-$(function(){
-  // load styles first, then data, then start polling
-  fetchStatusStyles(function(){
-    loadDashboard();
-    setInterval(loadDashboard, 5000);
+    // Register (open modal)
+    if(t.dataset.register){
+      openRegisterModal(Number(t.dataset.register));
+      return;
+    }
+    if(t.id === 'btnDoRegister'){
+      doRegister();
+      return;
+    }
+
+    // Run
+    if(t.dataset.run){
+      try{
+        const id = t.dataset.run;
+        const mode = t.dataset.mode || 'paper';
+        await fetchJSON(`/api/dashboard/${id}/run/`, { method:'POST', body: JSON.stringify({mode}) });
+        toast(mode==='live' ? 'Running LIVE' : 'Running PAPER'); loadAlgos();
+      }catch(err){ toast(err.message, 'is-danger'); }
+      return;
+    }
+
+    // Pause
+    if(t.dataset.pause){
+      try{
+        const id = t.dataset.pause;
+        const mode = t.dataset.mode || 'paper';
+        await fetchJSON(`/api/dashboard/${id}/pause/`, { method:'POST', body: JSON.stringify({mode}) });
+        toast('Paused'); loadAlgos();
+      }catch(err){ toast(err.message, 'is-danger'); }
+      return;
+    }
+
+    // Stop
+    if(t.dataset.stop){
+      try{
+        const id = t.dataset.stop;
+        const mode = t.dataset.mode || 'paper';
+        await fetchJSON(`/api/dashboard/${id}/stop/`, { method:'POST', body: JSON.stringify({mode}) });
+        toast('Stopped'); loadAlgos();
+      }catch(err){ toast(err.message, 'is-danger'); }
+      return;
+    }
+
+    // Logs
+    if(t.dataset.logs){
+      $('#logsBox').textContent='Loading…'; $('#logsModal').classList.add('is-active');
+      try{
+        const id = t.dataset.logs;
+        const d = await fetchJSON(`/api/dashboard/${id}/logs/?mode=paper&limit=200`);
+        $('#logsBox').textContent = (d.success ? (d.logs||[]) : []).map(
+          x=>`[${x.ts}] ${x.level}: ${x.message}`
+        ).join('\n') || 'No logs.';
+      }catch(err){
+        $('#logsBox').textContent = `Failed to load logs: ${err.message}`;
+      }
+      return;
+    }
+
+    // Performance
+    if(t.dataset.perf){
+      const id = Number(t.dataset.perf);
+      $('#perfTitle').textContent = t.dataset.name || 'Performance';
+      try{
+        const d = await fetchJSON(`/api/algo/performance?algo_id=${id}`);
+        showPerf(d);
+      }catch(_){ showPerf(null); }
+      $('#perfModal').classList.add('is-active');
+      return;
+    }
+
+    // Toggle hide/unhide (server-first; local fallback)
+    if(t.dataset.togglehide){
+      const id = String(t.dataset.togglehide);
+      const willHide = !HSET.has(id);
+      try{
+        await fetchJSON('/api/dashboard/toggle_hide/', {
+          method:'POST',
+          body: JSON.stringify({ algo_list_id: Number(id), hide: willHide })
+        });
+        applyHiddenLocal(id, willHide);
+      }catch(_){
+        applyHiddenLocal(id, willHide);
+      }
+      return;
+    }
+
+    // Close modals
+    if(t.matches('[data-close]')){
+      const sel=t.getAttribute('data-close'); if(sel) document.querySelector(sel).classList.remove('is-active');
+      return;
+    }
+
+    // Hidden manager
+    if(t.id==='btnHiddenMgr'){
+      buildHiddenList();
+      $('#hiddenModal').classList.add('is-active');
+      return;
+    }
+
+    // Unhide from manager
+    if(t.dataset.unhide){
+      const id = String(t.dataset.unhide);
+      applyHiddenLocal(id, false);
+      buildHiddenList();
+      return;
+    }
   });
 
-  $('#reloadBtn').on('click', loadDashboard);
-  $('#statusFilter').on('change', function(){ renderCards(cardsCache); });
+  // Background click closes modals
+  $$('.modal .modal-background').forEach(bg=> bg.addEventListener('click', ()=> bg.closest('.modal').classList.remove('is-active')));
 
-  $('#algoGrid').on('click', '.btn-register', function(){ openRegModal($(this).data('algo'), 'primary'); });
-  $('#algoGrid').on('click', '.btn-register-paper', function(){ openRegModal($(this).data('algo'), 'paper'); });
-  $('#algoGrid').on('click', '.btn-run', function(){
-    const algo=$(this).data('algo'), mode=$(this).data('mode');
-    $.ajax({url:`/api/dashboard/${algo}/run/`, method:'POST', contentType:'application/json',
-      data: JSON.stringify({mode})
-    }).done(loadDashboard);
-  });
-  $('#algoGrid').on('click', '.btn-pause', function(){
-    const algo=$(this).data('algo');
-    $.ajax({url:`/api/dashboard/${algo}/pause/`, method:'POST', contentType:'application/json',
-      data: JSON.stringify({mode:'live'})  // adjust if you pause paper
-    }).done(loadDashboard);
-  });
-  $('#algoGrid').on('click', '.btn-stop', function(){
-    const algo=$(this).data('algo');
-    $.ajax({url:`/api/dashboard/${algo}/stop/`, method:'POST', contentType:'application/json',
-      data: JSON.stringify({mode:'live'})
-    }).done(loadDashboard);
-  });
-  $('#algoGrid').on('click', '.btn-logs', function(){
-    const algoStr=$(this).data('algo');
-    const algo = Number(algoStr);
-    const card = cardsCache.find(x=>Number(x.algo_id)===algo);
-    const mode = (card && card.run_mode) || 'paper';
-    fetchLogs(algo, mode);
-  });
-});
+  // === Events ===
+  $('#searchInput').addEventListener('input', renderAll);
+  $('#statusFilter').addEventListener('change', renderAll);
+  $('#sortBy').addEventListener('change', renderAll);
+  $('#visibilityFilter').addEventListener('change', renderAll);
+  $('#btnRefresh').addEventListener('click', loadAlgos);
+
+  function startPoll(){ if($('#autoRefresh').checked){ POLL = setInterval(loadAlgos, 5000); } }
+  function stopPoll(){ if(POLL){ clearInterval(POLL); POLL=null; } }
+  $('#autoRefresh').addEventListener('change', ()=>{ stopPoll(); startPoll(); });
+
+  // === Init ===
+  loadAlgos(); startPoll();
+})();
 </script>
+
 {% endblock %}

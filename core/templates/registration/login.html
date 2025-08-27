@@ -11,46 +11,149 @@
 
           {% if messages %}
             {% for message in messages %}
-              <div class="notification is-danger is-light">
+              <div class="notification is-{{ message.tags|default:'info' }} is-light">
                 {{ message }}
               </div>
             {% endfor %}
           {% endif %}
 
-          <form method="POST" action="{% url 'login' %}">
+          {# ---- Stage 1: Enter email or phone ---- #}
+          {% if stage == 'identify' %}
+          <form method="post" action="{% url 'login' %}" novalidate>
             {% csrf_token %}
-
+            <input type="hidden" name="action" value="start">
             <div class="field">
-              <label class="label">Username or Email</label>
+              <label class="label">Email or Mobile</label>
               <div class="control">
-                <input class="input is-medium" type="text" name="username" placeholder="Enter your username or email" required autofocus>
+                <input class="input is-medium"
+                       type="text"
+                       name="identifier"
+                       placeholder="you@domain.com or +91XXXXXXXXXX"
+                       autocomplete="username"
+                       required autofocus>
               </div>
             </div>
-
-            <div class="field">
-              <label class="label">Password</label>
-              <div class="control">
-                <input class="input is-medium" type="password" name="password" placeholder="Enter your password" required>
-              </div>
-            </div>
-
-            <div class="field">
-              <label class="checkbox">
-                <input type="checkbox" name="remember"> Remember me
-              </label>
-            </div>
-
             <div class="field mt-4">
-              <button class="button is-link is-medium is-fullwidth">
-                Login
-              </button>
+              <button class="button is-link is-medium is-fullwidth">Continue</button>
             </div>
-
-            <p class="has-text-centered mt-4">
-              Don't have an account?
-              <a href="{% url 'signup' %}">Sign up now</a>
-            </p>
           </form>
+          <p class="has-text-centered mt-4">
+            New to Kuber? <a href="{% url 'signup' %}"><strong>SIGN UP</strong></a>
+          </p>
+          {% endif %}
+
+          {# ---- Stage 2: Password (with link to OTP) ---- #}
+          {% if stage == 'password' %}
+<form method="post" action="{% url 'login' %}">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="password">
+  <input type="hidden" name="identifier" value="{{ identifier }}">
+
+  <div class="field">
+    <label class="label" for="login_pwd">Password</label>
+    <div class="password-wrapper">
+      <input id="login_pwd" class="input" type="password" name="password"
+             placeholder="Enter your password" autocomplete="current-password" required autofocus>
+      <span class="toggle-eye" data-target="login_pwd" aria-label="Show password"><i class="fas fa-eye"></i></span>
+    </div>
+    <p class="help">
+      Prefer passwordless? <a href="#"
+        onclick="event.preventDefault(); document.getElementById('otpForm').submit();">Login with OTP</a>
+    </p>
+  </div>
+
+  <div class="field mt-4">
+    <button class="button is-link is-medium is-fullwidth">Login</button>
+  </div>
+</form>
+
+<form id="otpForm" method="post" action="{% url 'login' %}" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="send_otp">
+  <input type="hidden" name="identifier" value="{{ identifier }}">
+</form>
+{% endif %}
+
+          {# ---- Stage 3: OTP entry ---- #}
+          {% if stage == 'otp' %}
+<form method="post" action="{% url 'login' %}" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="action" value="verify_otp">
+  <input type="hidden" name="identifier" value="{{ identifier }}">
+  <div class="field">
+    <label class="label">Enter OTP</label>
+    <div class="control">
+      <input class="input"
+             type="text"
+             name="otp_code"
+             inputmode="numeric"
+             pattern="\\d{6}"
+             maxlength="6"
+             placeholder="6-digit code"
+             required autofocus>
+    </div>
+    <p class="help">We sent the same code to your email and mobile.</p>
+  </div>
+
+  <div class="level">
+    <div class="level-left">
+      <!-- Link-style resend with cooldown -->
+      <a id="resendLink"
+         class="is-size-7"
+         href="#"
+         data-cooldown="{{ otp_cooldown|default:30 }}">
+        Resend code <span id="resendTimer" aria-live="polite"></span>
+      </a>
+    </div>
+    <div class="level-right">
+      <div class="level-item">
+        <button class="button is-link is-normal" type="submit">
+          Verify &nbsp;and&nbsp; Login
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Hidden form used when Resend becomes active -->
+<form id="resendOtpForm" method="post" action="{% url 'login' %}" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="send_otp">
+  <input type="hidden" name="identifier" value="{{ identifier }}">
+</form>
+
+<script>
+(function () {
+  const link = document.getElementById('resendLink');
+  const timer = document.getElementById('resendTimer');
+  if (!link || !timer) return;
+
+  let t = parseInt(link.dataset.cooldown || '30', 10);
+  const disable = () => { link.style.pointerEvents = 'none'; link.style.opacity = '0.5'; link.setAttribute('aria-disabled','true'); };
+  const enable  = () => { link.style.pointerEvents = 'auto'; link.style.opacity = '1';   link.removeAttribute('aria-disabled'); };
+
+  const tick = () => {
+    if (t > 0) {
+      disable();
+      timer.textContent = ` (${String(t).padStart(2, '0')}s)`;
+      t -= 1;
+      setTimeout(tick, 1000);
+    } else {
+      timer.textContent = '';
+      enable();
+    }
+  };
+  tick();
+
+  link.addEventListener('click', function (e) {
+    if (t > 0) { e.preventDefault(); return; }
+    e.preventDefault();
+    document.getElementById('resendOtpForm').submit();
+  });
+})();
+</script>
+{% endif %}
+
         </div>
       </div>
     </div>

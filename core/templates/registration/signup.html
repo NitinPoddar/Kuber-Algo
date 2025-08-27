@@ -1,52 +1,327 @@
 {% extends "core/base.html" %}
 {% load static %}
-{% load widget_tweaks %}
+
 {% block content %}
 <section class="section">
   <div class="container">
     <div class="columns is-centered">
       <div class="column is-5-desktop is-8-tablet">
         <div class="box">
-          <h3 class="title has-text-centered is-4 has-text-primary">Sign Up</h3>
+          <h3 class="title has-text-centered is-4 has-text-primary">Create your account</h3>
 
           {% if messages %}
             {% for message in messages %}
-              <div class="notification is-danger is-light">
+              <div class="notification is-{{ message.tags|default:'info' }} is-light">
                 {{ message }}
-                <br>
-                Go to <a href="{% url 'login' %}">login page</a>.
               </div>
             {% endfor %}
           {% endif %}
 
-          <form method="POST" action="{% url 'signup' %}">
+          {# ===== STAGE 1: SIGNUP FORM ===== #}
+          {% if stage|default:'form' == 'form' %}
+          <form id="signupForm" method="post" action="{% url 'signup' %}" novalidate>
             {% csrf_token %}
 
-            {% for field in form %}
-              <div class="field">
-                <label class="label">{{ field.label }}</label>
-                <div class="control">
-                  {{ field|add_class:"input is-medium" }}
-                </div>
-                {% if field.errors %}
-                  <p class="help is-danger">{{ field.errors|striptags }}</p>
-                {% endif %}
+            <!-- Email -->
+            <div class="field">
+              <label class="label" for="email">Email</label>
+              <div class="control has-icons-right">
+                <input id="email" class="input" type="email" name="email"
+                       placeholder="you@domain.com"
+                       autocomplete="email"
+                       value="{{ form.email.value|default_if_none:'' }}" required>
+                <span id="emailTick" class="icon is-small is-right" style="display:none;">
+                  <i class="fas fa-check"></i>
+                </span>
               </div>
-            {% endfor %}
+              <p id="emailFormat" class="help is-danger" style="display:none;">Enter a valid email address.</p>
+              <p id="emailTaken" class="help is-danger" style="display:none;">This email is already registered.</p>
+              {% if form.email.errors %}<p class="help is-danger">{{ form.email.errors|striptags }}</p>{% endif %}
+            </div>
 
+            <!-- Mobile -->
+            <div class="field">
+              <label class="label" for="phone">Mobile</label>
+              <div class="control has-icons-right">
+                <input id="phone" class="input" type="text" name="phone"
+                       placeholder="+91XXXXXXXXXX"
+                       autocomplete="tel"
+                       value="{{ form.phone.value|default_if_none:'' }}" required>
+                <span id="phoneTick" class="icon is-small is-right" style="display:none;">
+                  <i class="fas fa-check"></i>
+                </span>
+              </div>
+              <p id="phoneFormat" class="help is-danger" style="display:none;">Enter a valid mobile number (7–15 digits, optional +).</p>
+              <p id="phoneTaken" class="help is-danger" style="display:none;">This mobile number is already registered.</p>
+              {% if form.phone.errors %}<p class="help is-danger">{{ form.phone.errors|striptags }}</p>{% endif %}
+            </div>
+
+            <!-- Password -->
+            <div class="field">
+              <label class="label" for="pwd">Password</label>
+              <div class="password-wrapper">
+    <input id="pwd" class="input" type="password" name="password1"
+           placeholder="Create a strong password" autocomplete="new-password" required>
+    <span class="toggle-eye" data-target="pwd" aria-label="Show password"><i class="fas fa-eye"></i></span>
+  </div>
+              {% if form.password1.errors %}<p class="help is-danger">{{ form.password1.errors|striptags }}</p>{% endif %}
+
+              <div class="content is-small mt-2">
+                <ul style="margin-left:1rem;">
+                  <li id="ruleLen">At least 8 characters</li>
+                  <li id="ruleLetter">Contains a letter (A–Z or a–z)</li>
+                  <li id="ruleDigit">Contains a number (0–9)</li>
+                  <li id="ruleSpecial">Contains a special character (!@#$…)</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Confirm -->
+            <div class="field">
+              <label class="label" for="pwd2">Confirm Password</label>
+              <div class="password-wrapper">
+    <input id="pwd2" class="input" type="password" name="password2"
+           placeholder="Re-enter your password" autocomplete="new-password" required>
+    <span class="toggle-eye" data-target="pwd2" aria-label="Show password"><i class="fas fa-eye"></i></span>
+  </div>
+  <p id="pwdMismatch" class="help is-danger" style="display:none;">Passwords do not match.</p>
+</div>
             <div class="field mt-4">
-              <button class="button is-link is-medium is-fullwidth">
-                Sign Up
-              </button>
+              <button class="button is-link is-fullwidth">Sign Up</button>
             </div>
           </form>
 
-          <p class="has-text-centered mt-4 is-size-7">
-            Already have an account? <a href="{% url 'login' %}">Log in</a>
+          <p class="has-text-centered mt-4">
+            Already have an account? <a href="{% url 'login' %}"><strong>Log in</strong></a>
           </p>
+          {% endif %}
+
+          {# ===== STAGE 2: OTP VERIFY (inline) ===== #}
+          {% if stage == 'otp' %}
+          <form method="post" action="{% url 'verify_otp' %}" novalidate>
+            {% csrf_token %}
+            <div class="field">
+              <label class="label">Email code</label>
+              <div class="control">
+                <input class="input" type="text" name="email_code"
+                       inputmode="numeric" pattern="\\d{6}" maxlength="6"
+                       placeholder="6-digit code" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Phone code</label>
+              <div class="control">
+                <input class="input" type="text" name="phone_code"
+                       inputmode="numeric" pattern="\\d{6}" maxlength="6"
+                       placeholder="6-digit code" required>
+              </div>
+              <p class="help">We sent codes to {{ email }} and {{ phone }}.</p>
+            </div>
+
+            <div class="level">
+              <div class="level-left">
+                <a id="resendLink" class="is-size-7" href="#" data-cooldown="{{ otp_cooldown|default:30 }}">
+                  Resend code <span id="resendTimer" aria-live="polite"></span>
+                </a>
+              </div>
+              <div class="level-right">
+                <div class="level-item">
+                  <button class="button is-link is-normal" type="submit">
+                    Verify &nbsp;and&nbsp; Login
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <form id="resendOtpForm" method="post" action="{% url 'resend_otps' %}" style="display:none;">
+            {% csrf_token %}
+          </form>
+          {% endif %}
+
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<script>
+function togglePwd(inputId, iconSpan){
+  const i = document.getElementById(inputId);
+  const icon = iconSpan.querySelector('i');
+  if (!i) return;
+  const isPwd = i.getAttribute('type') === 'password';
+  i.setAttribute('type', isPwd ? 'text' : 'password');
+  if (icon) icon.className = isPwd ? 'fas fa-eye-slash' : 'fas fa-eye';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const $ = (id) => document.getElementById(id);
+  const show = (el, on) => { if (!el) return; el.style.display = on ? 'block' : 'none'; };
+  const debounce = (fn, ms=250) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms);} };
+
+  const email = $('email');
+  const phone = $('phone');
+  const pwd   = $('pwd');
+  const pwd2  = $('pwd2');
+
+  // ===== Form stage logic =====
+  if (email && phone && pwd && pwd2) {
+    const emailFormat = $('emailFormat');
+    const emailTaken  = $('emailTaken');
+    const emailTick   = $('emailTick');
+
+    const phoneFormat = $('phoneFormat');
+    const phoneTaken  = $('phoneTaken');
+    const phoneTick   = $('phoneTick');
+
+    const ruleLen = $('ruleLen');
+    const ruleLetter = $('ruleLetter');
+    const ruleDigit = $('ruleDigit');
+    const ruleSpecial = $('ruleSpecial');
+    const pwdMismatch = $('pwdMismatch');
+
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const PHONE_RE = /^\+?\d{7,15}$/;
+
+    function validateEmailFormat() {
+      const ok = EMAIL_RE.test((email.value || '').trim());
+      show(emailFormat, !ok && email.value.length > 0);
+      email.classList.toggle('is-danger', !ok && email.value.length > 0);
+      email.classList.toggle('is-success', ok);
+      if (emailTick) emailTick.style.display = ok ? 'inline-flex' : 'none';
+      return ok;
+    }
+
+    function validatePhoneFormat() {
+      const ok = PHONE_RE.test((phone.value || '').trim());
+      show(phoneFormat, !ok && phone.value.length > 0);
+      phone.classList.toggle('is-danger', !ok && phone.value.length > 0);
+      phone.classList.toggle('is-success', ok);
+      if (phoneTick) phoneTick.style.display = ok ? 'inline-flex' : 'none';
+      return ok;
+    }
+
+    const checkUnique = debounce(function() {
+      const e = (email.value || '').trim();
+      const p = (phone.value || '').trim();
+      if (!e && !p) return;
+
+      const params = new URLSearchParams();
+      if (e) params.append('email', e.toLowerCase());
+      if (p) params.append('phone', p);
+
+      fetch("{% url 'check_unique' %}?" + params.toString(), { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : {})
+        .then(data => {
+          if (data.email_exists !== undefined) {
+            show(emailTaken, !!data.email_exists);
+            email.classList.toggle('is-danger', !!data.email_exists);
+            if (emailTick) emailTick.style.display = (!data.email_exists && validateEmailFormat()) ? 'inline-flex' : 'none';
+          }
+          if (data.phone_exists !== undefined) {
+            show(phoneTaken, !!data.phone_exists);
+            phone.classList.toggle('is-danger', !!data.phone_exists);
+            if (phoneTick) phoneTick.style.display = (!data.phone_exists && validatePhoneFormat()) ? 'inline-flex' : 'none';
+          }
+        }).catch(()=>{});
+    }, 250);
+
+    function updateChecklist() {
+      const v = pwd.value || '';
+      const okLen = v.length >= 8;
+      const okLetter = /[A-Za-z]/.test(v);
+      const okDigit = /\d/.test(v);
+      const okSpecial = /[^A-Za-z0-9]/.test(v);
+
+      const styleItem = (li, ok) => {
+        if (!li) return;
+        li.style.color = ok ? '#22a745' : '';
+        li.style.textDecoration = ok ? 'line-through' : 'none';
+      };
+      styleItem(ruleLen, okLen);
+      styleItem(ruleLetter, okLetter);
+      styleItem(ruleDigit, okDigit);
+      styleItem(ruleSpecial, okSpecial);
+
+      const allOk = okLen && okLetter && okDigit && okSpecial;
+      pwd.classList.toggle('is-success', allOk);
+      pwd.classList.toggle('is-danger', !allOk && v.length > 0);
+
+      updateMatch();
+    }
+
+    function updateMatch() {
+      const mismatch = (pwd.value && pwd2.value && pwd.value !== pwd2.value);
+      show(pwdMismatch, mismatch);
+      pwd2.classList.toggle('is-danger', mismatch);
+      pwd2.classList.toggle('is-success', !mismatch && pwd2.value.length > 0 && pwd.value.length > 0);
+    }
+
+    email.addEventListener('input', function(){ validateEmailFormat(); checkUnique(); });
+    phone.addEventListener('input', function(){ validatePhoneFormat(); checkUnique(); });
+    email.addEventListener('blur', checkUnique);
+    phone.addEventListener('blur', checkUnique);
+
+    pwd.addEventListener('input', updateChecklist);
+    pwd2.addEventListener('input', updateMatch);
+
+    document.getElementById('signupForm').addEventListener('submit', function(e){
+      const okEmail = validateEmailFormat();
+      const okPhone = validatePhoneFormat();
+      const dupE = emailTaken && emailTaken.style.display === 'block';
+      const dupP = phoneTaken && phoneTaken.style.display === 'block';
+      const mismatch = pwdMismatch && pwdMismatch.style.display === 'block';
+
+      if (!okEmail || !okPhone || dupE || dupP || mismatch) {
+        e.preventDefault();
+        if (!okEmail || dupE) { email.focus(); return; }
+        if (!okPhone || dupP) { phone.focus(); return; }
+        if (mismatch) { pwd2.focus(); return; }
+      }
+    });
+  }
+
+  // ===== OTP stage cooldown =====
+  const resendLink = document.getElementById('resendLink');
+  const resendTimer = document.getElementById('resendTimer');
+  if (resendLink && resendTimer) {
+    let t = parseInt(resendLink.dataset.cooldown || '30', 10);
+    const disable = () => { resendLink.style.pointerEvents = 'none'; resendLink.style.opacity = '0.5'; resendLink.setAttribute('aria-disabled','true'); };
+    const enable  = () => { resendLink.style.pointerEvents = 'auto'; resendLink.style.opacity = '1'; resendLink.removeAttribute('aria-disabled'); };
+
+    (function tick(){
+      if (t > 0) {
+        disable();
+        resendTimer.textContent = ` (${String(t).padStart(2,'0')}s)`;
+        t -= 1;
+        setTimeout(tick, 1000);
+      } else {
+        resendTimer.textContent = '';
+        enable();
+      }
+    })();
+
+    resendLink.addEventListener('click', function(e){
+      if (t > 0) { e.preventDefault(); return; }
+      e.preventDefault();
+      const f = document.getElementById('resendOtpForm');
+      if (f) f.submit();
+      // restart cooldown after click
+      t = parseInt(resendLink.dataset.cooldown || '30', 10);
+      (function tick(){
+        if (t > 0) {
+          disable();
+          resendTimer.textContent = ` (${String(t).padStart(2,'0')}s)`;
+          t -= 1;
+          setTimeout(tick, 1000);
+        } else {
+          resendTimer.textContent = '';
+          enable();
+        }
+      })();
+    });
+  }
+});
+</script>
 {% endblock %}

@@ -1,6 +1,11 @@
 // Put this near the top of condition.js
 // condition.js (top-level helpers)
 
+document.addEventListener('udv:changed', refreshAllStrikeTargetUDVOptions);
+
+// And run again right before we first render legs if you prefer:
+document.addEventListener('DOMContentLoaded', normalizeGlobals);
+
 function getRowsContainer(hostOrId) {
   const host = (typeof hostOrId === 'string') ? document.getElementById(hostOrId) : hostOrId;
   if (!host) return null;
@@ -36,6 +41,81 @@ function getRowsContainer(hostOrId) {
   host.appendChild(div);
   return div.querySelector('.conditions');
 }
+function getUDVNames() {
+  // 1) names from the global registry (already saved in UI, not DB)
+  const saved = Array.isArray(window.userDefinedVariables)
+    ? window.userDefinedVariables.map(u => u && u.name).filter(Boolean)
+    : [];
+
+  // 2) names currently typed in the editor UI (not saved yet)
+  const typed = Array.from(document.querySelectorAll('input[name^="user_constant_name_"]'))
+    .map(inp => inp.value && inp.value.trim())
+    .filter(Boolean);
+
+  // Merge & de-dupe
+  return Array.from(new Set([...saved, ...typed]));
+}
+
+function onStrikeTargetChange(idx) {
+  const sel = document.getElementById(`strike_target_${idx}`);
+  const custom = document.getElementById(`strike_target_custom_${idx}`);
+  if (!sel || !custom) return;
+  if (sel.value === "__custom__") {
+    custom.style.display = '';
+  } else {
+    custom.style.display = 'none';
+    custom.value = '';
+  }
+}
+
+function refreshStrikeTargetUDVOptionsFor(idx) {
+  const sel = document.getElementById(`strike_target_${idx}`);
+  if (!sel) return;
+  const names = getUDVNames();
+
+  const options = [
+    `<option value="">--Select UDV or Custom--</option>`,
+    ...names.map(n => `<option value="${n}">${n}</option>`),
+    `<option value="__custom__">Custom Number…</option>`
+  ];
+  sel.innerHTML = options.join('');
+
+  // If no UDVs exist, default to Custom Number to make UI usable
+  if (names.length === 0) {
+    sel.value = "__custom__";
+    onStrikeTargetChange(idx);
+  }
+}
+
+function refreshAllStrikeTargetUDVOptions() {
+  const names = getUDVNames();
+  document.querySelectorAll("select[id^='strike_target_']").forEach(sel => {
+    const idx = sel.id.split('_').pop();
+    const current = sel.value;
+    const options = [
+      `<option value="">--Select UDV or Custom--</option>`,
+      ...names.map(n => `<option value="${n}">${n}</option>`),
+      `<option value="__custom__">Custom Number…</option>`
+    ];
+    sel.innerHTML = options.join('');
+
+    if (current && names.includes(current)) {
+      sel.value = current;
+    } else if (current === "__custom__") {
+      sel.value = "__custom__";
+      onStrikeTargetChange(idx);
+    } else if (names.length === 0) {
+      sel.value = "__custom__";
+      onStrikeTargetChange(idx);
+    } else {
+      sel.value = "";
+      onStrikeTargetChange(idx);
+    }
+  });
+}
+
+// whenever expression.js updates userDefinedVariables, it should dispatch this:
+document.addEventListener('udv:changed', refreshAllStrikeTargetUDVOptions);
 
 function ensureGroup(containerId) {
   const host = document.getElementById(containerId);
@@ -73,38 +153,133 @@ function ensureGroup(containerId) {
   return div.querySelector('.conditions');
 }
 
+// ===== condition.js (drop-in, no syntax errors) =====
 
+// Ensure the backend-provided globals are usable
+function normalizeGlobals() {
+  if (typeof window.segments === 'string') {
+    try { window.segments = JSON.parse(window.segments); } catch (_) {}
+  }
+  if (typeof window.instrumentsBySegment === 'string') {
+    try { window.instrumentsBySegment = JSON.parse(window.instrumentsBySegment); } catch (_) {}
+  }
+  if (!Array.isArray(window.segments)) window.segments = [];
+  if (!window.instrumentsBySegment || typeof window.instrumentsBySegment !== 'object') {
+    window.instrumentsBySegment = {};
+  }
+}
 
+// Run once at load
+normalizeGlobals();
+
+// Helper: next leg index based on current DOM
+function nextLegIndex() {
+  return document.querySelectorAll(".leg-block").length;
+}
+
+// PUBLIC: called by your “Add Leg” button
 function addLeg() {
+  normalizeGlobals();
+
   const container = document.getElementById("legsContainer");
-  const legIndex = document.querySelectorAll(".leg-block").length;
-  const instrumentSelectId = `instrument_select_${legIndex}_${Date.now()}`;
+  if (!container) {
+    console.error("legsContainer not found in DOM");
+    return;
+  }
+  const legIndex = nextLegIndex();
+  const instrumentSelectId = `instrument_${legIndex}`;
+
   const legDiv = document.createElement("div");
   legDiv.classList.add("box", "leg-block", "mt-5");
 
+  // Build HTML for a complete leg
   legDiv.innerHTML = `
     <h2 class="subtitle">Leg ${legIndex + 1}</h2>
+
+    <!-- 1) Exchange Segment -->
     <div class="field">
-      <label class="label">Instrument</label>
+      <label class="label">Exchange Segment</label>
       <div class="select is-fullwidth">
-        <select id="${instrumentSelectId}" class="instrument-dropdown" name="instrument_name[]" onchange="populateExpiryAndStrike(this, ${legIndex})" required style="width: 100%;">
+        <select name="exchange_segment[]" id="segment_${legIndex}"
+                onchange="onSegmentChange(${legIndex})" required>
           <option value="">--Select--</option>
-          ${instruments.map(i => `<option value="${i.name}">${i.name}</option>`).join("")}
+          ${
+            (Array.isArray(window.segments) ? window.segments : [])
+              .map(s => `<option value="${s}">${s}</option>`)
+              .join('')
+          }
         </select>
       </div>
     </div>
+
+    <!-- 2) Instrument (filtered by segment) -->
+    <div class="field">
+      <label class="label">Instrument</label>
+      <div class="select is-fullwidth">
+        <select id="${instrumentSelectId}" class="instrument-dropdown" name="instrument_name[]"
+                onchange="populateExpiryAndStrike(this, ${legIndex})" required>
+          <option value="">--Select segment first--</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Lot sizing -->
+    <div class="fields is-grouped">
+      <div class="field" style="margin-right:1rem;">
+        <label class="label">Lot Qty</label>
+        <input class="input" type="number" min="1" step="1" name="lot_qty[]" value="1" required>
+      </div>
+      <div class="field">
+        <label class="label">Qty per Lot</label>
+        <input class="input" type="number" name="lot_size[]" id="lot_size_${legIndex}" readonly placeholder="—">
+      </div>
+    </div>
+
+    <!-- Expiry -->
     <div class="field">
       <label class="label">Expiry</label>
       <div class="select">
         <select name="expiry_date[]" id="expiry_${legIndex}" required></select>
       </div>
     </div>
+
+    <!-- Strike mode -->
     <div class="field">
+      <label class="label">Strike Mode</label>
+      <div class="select">
+        <select name="strike_kind[]" id="strike_kind_${legIndex}" onchange="toggleStrikeMode(${legIndex})" required>
+          <option value="ABS" selected>Absolute</option>
+          <option value="ATM">ATM</option>
+          <option value="OTM">OTM (by target)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ABS strike dropdown -->
+    <div class="field" id="strike_abs_wrap_${legIndex}">
       <label class="label">Strike</label>
       <div class="select">
         <select name="strike_price[]" id="strike_${legIndex}" required></select>
       </div>
     </div>
+
+    <!-- ATM/OTM target -->
+   <div class="field" id="strike_target_wrap_${legIndex}" style="display:none;">
+  <label class="label">Target</label>
+  <div class="select is-fullwidth">
+    <select name=""strike_target[]" id="strike_target_${legIndex}"
+            onchange="onStrikeTargetChange(${legIndex})">
+      <!-- options injected by refreshStrikeTargetUDVOptionsFor -->
+    </select>
+  </div>
+  <input class="input mt-2" type="number" step="1"
+         name="strike_target_custom[]" id="strike_target_custom_${legIndex}"
+         style="display:none;" placeholder="e.g. 200">
+</div>
+
+
+
+    <!-- Option / Direction / Order -->
     <div class="field">
       <label class="label">Option Type</label>
       <div class="select">
@@ -114,6 +289,7 @@ function addLeg() {
         </select>
       </div>
     </div>
+
     <div class="field">
       <label class="label">Order Direction</label>
       <div class="select">
@@ -123,6 +299,7 @@ function addLeg() {
         </select>
       </div>
     </div>
+
     <div class="field">
       <label class="label">Order Type</label>
       <div class="select">
@@ -133,48 +310,120 @@ function addLeg() {
         </select>
       </div>
     </div>
+
+    <!-- Conditions (hooks assumed to exist in your codebase) -->
     <div class="field">
       <label class="label">Entry Conditions</label>
       <div id="entry_conditions_${legIndex}" class="condition-group"></div>
-      <button type="button" class="button is-small is-link mt-2" onclick="addRootCondition('entry_conditions_${legIndex}', this)">➕ Condition</button>
+      <button type="button" class="button is-small is-link mt-2"
+              onclick="addRootCondition('entry_conditions_${legIndex}', this)">➕ Condition</button>
     </div>
 
     <div class="field">
       <label class="label">Exit Conditions</label>
       <div id="exit_conditions_${legIndex}" class="condition-group"></div>
-      <button type="button" class="button is-small is-link mt-2" onclick="addRootCondition('exit_conditions_${legIndex}', this)">➕ Condition</button>
+      <button type="button" class="button is-small is-link mt-2"
+              onclick="addRootCondition('exit_conditions_${legIndex}', this)">➕ Condition</button>
     </div>
   `;
 
   container.appendChild(legDiv);
-
-  // Activate Select2 on instrument dropdown
-  setTimeout(() => {
-    $(`#${instrumentSelectId}`).select2({
-      width: '100%',
-      placeholder: "Search symbol",
-      allowClear: true
-    });
-  }, 0);
+refreshStrikeTargetUDVOptionsFor(legIndex);
+  // Enhance the instrument dropdown with Select2 (if available)
+  if (window.jQuery && jQuery.fn && typeof jQuery.fn.select2 === 'function') {
+    setTimeout(() => {
+      jQuery(`#${instrumentSelectId}`).select2({
+        width: '100%',
+        placeholder: "Search symbol",
+        allowClear: true
+      });
+    }, 0);
+  }
 }
 
-function populateExpiryAndStrike(selectEl, legIndex) {
-  const selected = selectEl.value;
-  const expirySelect = document.getElementById(`expiry_${legIndex}`);
-  const strikeSelect = document.getElementById(`strike_${legIndex}`);
-  const matches = instruments.filter(i => i.name === selected);
+// PUBLIC: reacts to segment change → fills instrument list
+function onSegmentChange(idx) {
+  normalizeGlobals();
 
-  let expiries = new Set();
-  let strikes = new Set();
+  const seg = document.getElementById(`segment_${idx}`).value;
+  const instSel = document.getElementById(`instrument_${idx}`);
+  const expirySel = document.getElementById(`expiry_${idx}`);
+  const strikeSel = document.getElementById(`strike_${idx}`);
+  const lotSizeInput = document.getElementById(`lot_size_${idx}`);
 
-  matches.forEach(i => {
-    (i.expiries || []).forEach(e => expiries.add(e));
-    (i.strikes || []).forEach(s => strikes.add(s));
+  if (!instSel) return;
+
+  instSel.innerHTML = `<option value="">--Select--</option>`;
+  if (expirySel) expirySel.innerHTML = ``;
+  if (strikeSel) strikeSel.innerHTML = ``;
+  if (lotSizeInput) lotSizeInput.value = '';
+
+  const list = (window.instrumentsBySegment && window.instrumentsBySegment[seg]) || [];
+  list.forEach(i => {
+    const opt = document.createElement('option');
+    opt.value = i.name; opt.textContent = i.name;
+    instSel.appendChild(opt);
   });
 
-  expirySelect.innerHTML = [...expiries].sort().map(e => `<option value="${e}">${e}</option>`).join('');
-  strikeSelect.innerHTML = [...strikes].sort((a, b) => a - b).map(s => `<option value="${s}">${s}</option>`).join('');
+  // If using Select2, refresh it after repopulating
+  if (window.jQuery && jQuery.fn && typeof jQuery.fn.select2 === 'function') {
+    jQuery(instSel).trigger('change.select2');
+  }
 }
+
+// PUBLIC: fill expiry/strike/lot size for selected instrument
+function populateExpiryAndStrike(selectEl, idx) {
+  normalizeGlobals();
+
+  const seg = document.getElementById(`segment_${idx}`).value;
+  const name = selectEl.value;
+
+  const expirySelect = document.getElementById(`expiry_${idx}`);
+  const strikeSelect = document.getElementById(`strike_${idx}`);
+  const lotSizeInput = document.getElementById(`lot_size_${idx}`);
+
+  const list = (window.instrumentsBySegment && window.instrumentsBySegment[seg]) || [];
+  const meta = list.find(i => i.name === name);
+
+  const expiries = (meta && Array.isArray(meta.expiries) ? meta.expiries.slice() : []).sort();
+  const strikes  = (meta && Array.isArray(meta.strikes)  ? meta.strikes.slice()  : []).sort((a,b) => Number(a) - Number(b));
+
+  if (expirySelect) {
+    expirySelect.innerHTML = expiries.map(e => `<option value="${e}">${e}</option>`).join('');
+  }
+  if (strikeSelect) {
+    strikeSelect.innerHTML = strikes.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+  if (lotSizeInput) {
+    lotSizeInput.value = meta && meta.lotsize ? meta.lotsize : '';
+  }
+}
+
+// PUBLIC: show/hide ABS strike vs OTM target field
+function toggleStrikeMode(idx) {
+  const kind = document.getElementById(`strike_kind_${idx}`).value;
+  const absWrap = document.getElementById(`strike_abs_wrap_${idx}`);
+  const tgtWrap = document.getElementById(`strike_target_wrap_${idx}`);
+
+  if (kind === 'ABS') {
+    absWrap.style.display = '';
+    tgtWrap.style.display = 'none';
+  } else if (kind === 'ATM') {
+    absWrap.style.display = 'none';
+    tgtWrap.style.display = 'none';
+  } else { // OTM
+    absWrap.style.display = 'none';
+    tgtWrap.style.display = '';
+    // ensure UDV dropdown is populated the moment OTM is selected
+    refreshStrikeTargetUDVOptionsFor(idx);
+  }
+}
+
+// Optional: re-normalize if DOM is ready late
+document.addEventListener('DOMContentLoaded', normalizeGlobals);
+
+// ===== end condition.js =====
+
 
 function addConditionGroup(containerId) {
   const container = document.getElementById(containerId);

@@ -42,8 +42,29 @@ def token_by_symbol(instruments, symbol):
         if (row.get("symbol") or "").upper() == symbol:
             return row.get("token")
     return None
-
-
+def exchangeSegmentByBroker(Exchange):
+    if Exchange=="NSE":
+        return "NSECM"
+    elif Exchange=="NFO":
+        return "NSEFO"
+    elif Exchange=="CDS":
+        return "NSECD"
+    elif Exchange=="MCX":
+        return "MCXFO"
+    elif Exchange=="BSE":
+        return "BSECM"
+    elif Exchange=="BFO":
+        return "BSEFO"
+    else:
+        return "Invalid"
+    
+def exchange_by_symbol(instruments, symbol):
+    """Return the first token whose 'symbol' matches exactly (case-insensitive)."""
+    symbol = (symbol or "").strip().upper()
+    for row in instruments:
+        if (row.get("symbol") or "").upper() == symbol:
+            return row.get("exch_seg")
+    return None
 
 # Map your symbols -> instrument tokens (you can pass these in credentials)
 def _resolve_token(symbol: str, creds: Dict[str, Any]) -> Optional[int]:
@@ -138,17 +159,27 @@ class WisdomClient(BrokerClient):
     
 
     # ---- required by BrokerClient ----
-    def fetch_candles(self, symbol: str, timeframe: str, lookback: int = 100) -> List[Dict[str, Any]]:
+    def fetch_candles(self, symbol: str, timeframe: str,exchange_segment: str, lookback: int = 100) -> List[Dict[str, Any]]:
         self._ensure_login() 
         #token = _resolve_token(symbol, self.credentials)
         token=token_by_symbol(instrument_list,symbol)
         if not token:
             raise RuntimeError(f"No XTS instrument token for symbol '{symbol}'. "
                                f"Provide credentials.instrument_token_map or implement search.")
-        exchange_segment=self.account.credentials.get("exchange_segment")
+        
+    # Check if user input is valid (non-empty string, not None)
+        if exchange_segment is not None and str(exchange_segment).strip() != "":
+            return exchange_segment
+        else:
+            exchange_segment=exchange_by_symbol(instrument_list,symbol)
+                
+        
+        exchange_segment=exchangeSegmentByBroker(exchange_segment)
+        
         tf_min = _tf_to_minutes(timeframe)
         start, end = _now_range_for(tf_min, lookback)
         comp = tf_min
+        print(f"[DEBUG] Using exchange_segment={exchange_segment} for account {self.account.id} for token={token} starting at {start} ending at {end}")
 
         resp = self._xts.get_ohlc(
             exchangeSegment=exchange_segment,

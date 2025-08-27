@@ -1,0 +1,350 @@
+/* =========================================================
+   KUBER — Mobile-first UI kit (Bulma friendly)
+   ========================================================= */
+
+/* ---------- Design tokens ---------- */
+:root{
+  /* Brand & surfaces */
+  --brand: #2563eb;
+  --brand-ink: #0f172a;
+  --muted: #64748b;
+  --line: #e5e7eb;
+  --soft: #f8fafc;
+
+  /* States */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger:  #ef4444;
+
+  /* Cards */
+  --radius: 12px;
+  --shadow: 0 6px 18px rgba(2, 6, 23, .06);
+
+  /* Condition rails */
+  --rail:   #5e5ce6;
+  --rail-2: #8ea2ff;
+
+  /* Condition rows */
+  --row-bg:     #ffffff;
+  --row-border: #e6e8f0;
+  --focus-ring: rgba(94,92,230,.25);
+
+  /* Entry/Exit tints */
+  --entry-bg:     #f6fff6;
+  --entry-border: #d6f5d6;
+  --exit-bg:      #fff7f6;
+  --exit-border:  #ffd7d1;
+
+  /* Leg cards */
+  --card-bg: #ffffff;
+  --card-border: var(--row-border, #e6e8f0);
+  --card-shadow: 0 2px 10px rgba(0,0,0,.04);
+  --leg-accent: #f7b7a3;
+}
+
+/* ---------- Base ---------- */
+html{ font-size: 16px; }
+body{
+  background-color: #f3fdf7;
+  color: var(--brand-ink);
+  font-family: "Inter", "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+.section{ padding: 2rem 1rem; }
+.content-box{
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+h1.title{ font-weight: 700; letter-spacing: -0.02em; }
+
+/* ---------- Navbar ---------- */
+.navbar{ box-shadow: 0 2px 10px rgba(2,6,23,.05); }
+.navbar .navbar-item,
+.navbar .navbar-link{ color: #fff; }
+.navbar-item.has-text-white{
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  letter-spacing: .3px;
+  color: #fff !important;
+}
+.navbar-item.has-text-white:hover{ background:#00795c; }
+.navbar-burger{ height: 3rem; width: 3rem; }
+.navbar-menu{ backdrop-filter: saturate(140%) blur(6px); }
+.user-dropdown-trigger{
+  border-radius: 999px;
+  background:#00c4a7;
+  color:#fff;
+  padding:.4em .9em;
+  font-size:.85rem;
+  font-weight:500;
+  font-family:"Poppins", sans-serif;
+  display:flex; align-items:center; gap:5px;
+}
+.user-dropdown-trigger:hover{ background:#00795c; }
+.user-dropdown-item{ font-size:.85rem; }
+
+/* ---------- Boxes & large sections ---------- */
+.box{
+  border:1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+#basicDetailsSection,
+#strategySection,
+#jsonPreviewBox{
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: var(--card-shadow);
+  margin-top: 1rem;
+}
+
+/* Leg blocks with accent rail */
+.box.leg-block{
+  position: relative;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--card-shadow);
+  padding-top: .9rem;
+}
+.box.leg-block > .subtitle{
+  margin-top:.2rem; margin-bottom:.75rem; font-weight:600;
+}
+.box.leg-block::before{
+  content:"";
+  position:absolute; left:0; top:0; bottom:0;
+  width:4px; border-radius:14px 0 0 14px;
+  background: var(--leg-accent); opacity:.9;
+}
+
+/* Subtle separators inside cards */
+#basicDetailsSection .field + .field,
+.box.leg-block .field + .field{
+  margin-top:.75rem; padding-top:.75rem; border-top:1px dashed #edf0f6;
+}
+
+/* User-defined variable cards */
+#userConstantsContainer .box{
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.03);
+}
+
+/* ---------- Forms ---------- */
+.field{ margin-bottom:.9rem; }
+.label{ font-weight:600; font-size:.95rem; color:var(--brand-ink); }
+.input, .textarea, .select select{
+  border-radius: 10px;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.input:focus, .textarea:focus, .select select:focus{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 .15rem rgba(37,99,235,.15);
+}
+.help.is-danger{ margin-top:.35rem; }
+.button{ border-radius:10px; }
+
+/* ---------- Select2 polish ---------- */
+.select2-container{ width:100% !important; }
+.select2-selection{
+  min-height: 2.4rem !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+}
+.select2-selection__rendered{ line-height:2.3rem !important; padding-left:.75rem !important; }
+.select2-selection__arrow{ height:2.3rem !important; }
+.select2-dropdown{ border-color:var(--line) !important; border-radius:10px !important; }
+.select2-results__option{ padding:.55rem .75rem; font-size:.95rem; }
+.modal.is-active .select2-container{ z-index:9999 !important; }
+.select2-container--open{ z-index:9999 !important; } /* ensure above Bulma boxes */
+
+/* ---------- Condition Builder ---------- */
+/* Group rail */
+.nested-condition{
+  position:relative;
+  border-left: 3px solid var(--rail);
+  padding-left: 12px;
+  margin-left: 8px;
+  border-radius: 10px;
+  background: transparent; /* rows provide tint */
+}
+.nested-condition .nested-condition{ border-left-color: var(--rail-2); }
+
+/* Elbow line from rail to each row */
+.condition-row{ position:relative; }
+.condition-row::before{
+  content:"";
+  position:absolute; left:-14px; top:1.2em; width:12px;
+  border-top:2px solid var(--rail);
+  pointer-events:none; z-index:0;
+}
+.nested-condition .nested-condition .condition-row::before{ border-top-color: var(--rail-2); }
+
+/* Row card */
+.condition-row{
+  display:flex; flex-wrap:wrap; align-items:flex-start; gap:.5rem;
+  background: var(--row-bg);
+  border:1px solid var(--row-border);
+  border-radius:10px;
+  padding:.55rem .65rem; margin-bottom:.6rem;
+  box-shadow:0 1px 0 rgba(0,0,0,.02);
+  z-index:1; /* above elbow line */
+  transition: box-shadow .15s ease, background .15s ease, border-color .15s ease;
+}
+.condition-row:hover{ box-shadow:0 2px 6px rgba(0,0,0,.06); }
+.condition-row:focus-within{ box-shadow:0 0 0 2px var(--focus-ring); border-color:#cfd4ff; }
+
+/* Layout sizing */
+.condition-row > .select.mr-2:first-child{ flex:0 0 240px; min-width:200px; }
+.condition-row .condition-parameters{ flex:1 1 260px; min-width:220px; }
+.condition-row .condition-operator{ width:90px; }
+.condition-row .rhs-mode{ width:140px; }
+.condition-row .condition-value{ flex:1 1 180px; min-width:140px; }
+.condition-row .rhs-input{
+  flex:1 1 260px; min-width:220px;
+  display:inline-flex; align-items:center; gap:.4rem;
+}
+.condition-row .delete{ margin-left:.25rem; }
+.condition-row .button.is-small.is-warning{ margin-left:.25rem; }
+
+/* Entry/Exit tints */
+[id^="entry_conditions_"] .condition-row{
+  background: var(--entry-bg);
+  border-color: var(--entry-border);
+}
+[id^="exit_conditions_"] .condition-row{
+  background: var(--exit-bg);
+  border-color: var(--exit-border);
+}
+
+/* Validation highlight */
+.condition-row.highlight-red{
+  border:2px dashed #ff5a5f; background:#fff0f0;
+}
+
+/* Expression builder group item */
+.expression-item .field.box{
+  border:1px solid var(--line);
+  border-radius:10px;
+  background: var(--soft);
+}
+
+/* UDV small helper line */
+.udv-header{ margin-bottom:.5rem; }
+#userConstantsContainer .is-size-7{
+  font-style:italic; background:#f4f7ff; padding:.25rem .5rem; border-left:3px solid var(--success);
+}
+
+/* ---------- Legs layout (final, unified) ---------- */
+#legsContainer{
+  display:grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap:1rem;
+}
+/* Mobile default: full width */
+#legsContainer > .leg-block{
+  grid-column: 1 / -1;
+  min-width:0; box-sizing:border-box;
+}
+/* Small laptops / tablets landscape: 2-up */
+@media (min-width: 900px){
+  #legsContainer > .leg-block{ grid-column: span 6; }
+}
+/* Larger desktops: optional 3-up */
+@media (min-width: 1280px){
+  #legsContainer > .leg-block{ grid-column: span 4; }
+}
+
+/* ---------- Preview panels ---------- */
+#jsonPreviewBox pre{
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  max-height: 45vh;
+  overflow: auto;
+  background: #0b1020;
+  color: #e5e7eb;
+  border-radius: 10px;
+  padding: .75rem 1rem;
+}
+
+/* ---------- Tables ---------- */
+.table-wrapper{
+  width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  border:1px solid var(--line);
+  border-radius:10px;
+}
+.table{ min-width:640px; }
+
+/* ---------- Notifications & footer ---------- */
+.notification{ border-radius:10px; box-shadow: var(--shadow); }
+footer.footer{
+  background:#eaf7f0; color:#4a4a4a; padding:1rem; text-align:center; font-size:.9rem;
+}
+
+/* ---------- Responsive tweaks ---------- */
+@media (max-width: 1024px){
+  .section{ padding:1.5rem 1rem; }
+  .content-box{ padding:1rem; }
+  h1.title{ font-size:1.5rem; }
+}
+@media (max-width: 768px){
+  html{ font-size:15px; }
+  .section{ padding:1rem .75rem; }
+  .content-box{ padding:.9rem; }
+  h1.title{ font-size:1.35rem; }
+
+  /* Buttons stack on small screens */
+  .button:not(.navbar-item){ width:100%; }
+  .buttons .button{ margin-right:0; margin-bottom:.5rem; }
+
+  /* Condition rows stack nicely */
+  .condition-row{ padding:.75rem; gap:.6rem .5rem; }
+  .condition-row > .select,
+  .condition-row .condition-parameters,
+  .condition-row .rhs-input,
+  .condition-row .condition-value{
+    flex:1 1 100%; min-width:100% !important;
+  }
+  .condition-row .condition-operator,
+  .condition-row .rhs-mode{ width:100%; }
+
+  /* Group rails tighten a bit */
+  .nested-condition{ border-left-width:2px; padding-left:10px; margin-left:6px; }
+  .condition-row::before{ width:10px; left:-12px; }
+}
+@media (max-width: 480px){
+  html{ font-size:14px; }
+  h1.title{ font-size:1.25rem; }
+}
+
+/* ---------- Utilities ---------- */
+.mobile-hide{ display:none !important; }
+@media (min-width: 769px){ .mobile-hide{ display: initial !important; } }
+.mobile-only{ display: initial !important; }
+@media (min-width: 769px){ .mobile-only{ display: none !important; } }
+.mobile-stack{ display:flex; flex-direction:column; gap:.5rem; }
+.mobile-fullwidth{ width:100% !important; }
+
+/* ---------- Dark mode (optional, auto) ---------- */
+@media (prefers-color-scheme: dark){
+  :root{
+    --card-bg:#14161a; --card-border:#2a2e37; --card-shadow:0 1px 4px rgba(0,0,0,.5);
+    --leg-accent:#8ea2ff;
+    --row-bg:#14161a; --row-border:#2a2e37;
+    --entry-bg:#101a12; --entry-border:#223a2a;
+    --exit-bg:#1a1413; --exit-border:#3a2420;
+    --focus-ring: rgba(134,179,255,.35);
+  }
+  #basicDetailsSection, #strategySection, #jsonPreviewBox,
+  .box.leg-block, #userConstantsContainer .box{ box-shadow:none; }
+  .condition-row:hover{ box-shadow:0 0 0 1px rgba(255,255,255,.04) inset; }
+}

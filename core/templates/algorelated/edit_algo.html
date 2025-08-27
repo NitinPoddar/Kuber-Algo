@@ -116,26 +116,7 @@ Created on Tue Aug  5 23:18:49 2025
   <h2 class="subtitle mt-3">🐍 Python Preview</h2>
   <pre><code id="pythonPreview"></code></pre>
 </div>
-<style>
-  
-</style>
 
-<div class="modal" id="varInUseModal">
-  <div class="modal-background"></div>
-  <div class="modal-card">
-    <header class="modal-card-head">
-      <p class="modal-card-title">Cannot Delete Variable</p>
-      <button class="delete" aria-label="close" onclick="closeVarInUseModal()"></button>
-    </header>
-    <section class="modal-card-body">
-      <p class="has-text-danger">❌ This variable is currently being used in one or more condition rows.</p>
-      <p>Please remove it from those rows before deleting.</p>
-    </section>
-    <footer class="modal-card-foot">
-      <button class="button" onclick="closeVarInUseModal()">OK</button>
-    </footer>
-  </div>
-</div>
 
 {{ instruments_json|json_script:"instruments-data" }}
 {{ indicators_json|json_script:"indicators-data" }}
@@ -145,15 +126,18 @@ Created on Tue Aug  5 23:18:49 2025
 
 <script>
 // 1) Expose the raw JSON directly to JS variables (no parsing needed in utils.js)
- window.instruments          = {{ instruments_json|safe }};
-  window.indicators           = {{ indicators_json|safe }};
+ //window.instruments  = {{ instruments_json|safe }};
+ window.segments = {{ segments|safe }};  // e.g., ["NFO","NSE","BSE","MCX"]
+ window.instrumentsBySegment = {{ instruments_by_segment_json|safe }};
+ window.indicators           = {{ indicators_json|safe }};
   window.all_symbols          = {{ symbol_list_json|safe }};
   window.userDefinedVariables = {{ user_vars_json|safe }};
   window.legs                 = {{ legs_json|safe }};
+  window.symbolList = {{ symbol_list_json|safe }};
   
 // 2) Expose the edit‐mode flag
 window.isEditMode   = {{ is_edit_mode|yesno:"true,false" }};
-
+window.userVars = {{ user_vars_json|safe }};
 
 </script>
 {% block scripts %}
@@ -166,6 +150,13 @@ document.addEventListener('DOMContentLoaded', function () {
     endpoint: '/check_algo_name/'
   });
 });
+
+ document.addEventListener('DOMContentLoaded', function () {
+    if (typeof preloadUserDefinedVariables === 'function') {
+      preloadUserDefinedVariables();               // fills the UDV UI
+    }
+    document.dispatchEvent(new CustomEvent('udv:changed', {detail:{action:'preload'}}));
+  });
 </script>
 {% endblock %}
 

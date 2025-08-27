@@ -94,13 +94,16 @@ Created on Tue Aug  5 23:18:49 2025
 
 <script>
 // 1) Expose the raw JSON directly to JS variables (no parsing needed in utils.js)
-window.instruments  = {{ instruments_json|safe }};
+//window.instruments  = {{ instruments_json|safe }};
+window.segments = {{ segments|safe }};  // e.g., ["NFO","NSE","BSE","MCX"]
+window.instrumentsBySegment = {{ instruments_by_segment_json|safe }};
 window.indicators   = {{ indicators_json|safe }};
 window.all_symbols  = {{ symbol_list_json|safe }};
 window.userDefinedVariables = [];   // add page starts empty
 window.legs = [];                   // add page starts empty
 window.isEditMode = false;
-  
+window.userVars = {{ user_vars_json|safe }};
+window.symbolList = {{ symbol_list_json|safe }};
 </script>
 {% block scripts %}
 <script>
@@ -127,6 +130,10 @@ window.isEditMode = false;
 
 <script src="{% static 'js/utils.js' %}"></script>
 <script src="{% static 'js/expression.js' %}"></script>
+<script>
+  // if backend didn't set it, ensure it exists to avoid undefined errors
+  window.userDefinedVariables = Array.isArray(window.userDefinedVariables) ? window.userDefinedVariables : [];
+</script>
 <script src="{% static 'js/condition.js' %}"></script>
 <script src="{% static 'js/preview.js' %}"></script>
 <script src="{% static 'js/init.js' %}"></script>

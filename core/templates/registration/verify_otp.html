@@ -1,0 +1,84 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-5-desktop is-8-tablet">
+        <div class="box">
+          <h3 class="title has-text-centered is-4 has-text-primary">Verify your account</h3>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="notification is-{{ message.tags|default:'info' }} is-light">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <p class="mb-4">
+            We’ve sent 6-digit codes to:
+            {% if email %}<strong>{{ email }}</strong>{% endif %}
+            {% if phone %} &nbsp;and&nbsp; <strong>{{ phone }}</strong>{% endif %}.
+          </p>
+
+          <form method="post" action="{% url 'verify_otp' %}">
+            {% csrf_token %}
+            <div class="field">
+              <label class="label">Email Code</label>
+              <div class="control">
+                <input class="input is-medium" name="email_code" maxlength="6" placeholder="Enter email OTP" required>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Phone Code</label>
+              <div class="control">
+                <input class="input is-medium" name="phone_code" maxlength="6" placeholder="Enter SMS OTP" required>
+              </div>
+            </div>
+
+            <div class="field is-grouped is-grouped-right">
+              <div class="control">
+                <button type="submit" class="button is-link is-medium">Verify</button>
+              </div>
+              <div class="control">
+                <button type="button" id="resendBtn" class="button is-light is-medium">Resend codes</button>
+              </div>
+            </div>
+          </form>
+
+          <p class="has-text-centered is-size-7 mt-3">
+            Enter both codes exactly as received. Codes expire in 10 minutes.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+// CSRF helper from Django docs
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  if (match) return decodeURIComponent(match[2]);
+}
+const csrftoken = getCookie('csrftoken');
+
+document.getElementById('resendBtn').addEventListener('click', function(){
+  fetch("{% url 'resend_otps' %}", {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrftoken},
+    credentials: 'same-origin'
+  }).then(r => r.json())
+    .then(data => {
+      if (data && data.ok) {
+        alert('Codes resent. Check your email & SMS.');
+      } else {
+        alert((data && data.error) ? data.error : 'Unable to resend right now.');
+      }
+    })
+    .catch(() => alert('Network error while resending codes.'));
+});
+</script>
+{% endblock %}

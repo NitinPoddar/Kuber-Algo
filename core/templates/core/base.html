@@ -50,20 +50,27 @@
               {{ user.name|default:user.username }}
             </a>
             <div class="navbar-dropdown is-right is-boxed">
-              <a class="navbar-item user-dropdown-item" href="{% url 'profile' %}">
-                <i class="fas fa-id-badge mr-2"></i> Profile
-              </a>
-              <a class="navbar-item" href="{% url 'variable_parameters' %}">
-                ⚙️ Variable Management
-              </a>
-              <a class="navbar-item" href="{% url 'environment' %}">
-                ⚙️ Environment Management
-              </a>
-              <hr class="navbar-divider">
-              <a class="navbar-item user-dropdown-item" href="{% url 'logout' %}">
-                <i class="fas fa-sign-out-alt mr-2"></i> Logout
-              </a>
-            </div>
+  <a class="navbar-item user-dropdown-item" href="{% url 'profile_page' %}">
+    <i class="fas fa-id-badge mr-2"></i> Profile
+  </a>
+  <a class="navbar-item" href="{% url 'variable_parameters' %}">
+    ⚙️ Variable Management
+  </a>
+  <a class="navbar-item" href="{% url 'environment' %}">
+    ⚙️ Environment Management
+  </a>
+  <hr class="navbar-divider">
+
+  <!-- POST logout styled like a navbar item -->
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="navbar-item button is-white is-fullwidth has-text-left">
+      <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
+      <span>Logout</span>
+    </button>
+  </form>
+</div>
+
           </div>
 
           {% if user.is_staff %}
@@ -129,6 +136,21 @@
         });
       });
     });
+    
+document.addEventListener("DOMContentLoaded", function(){
+  // Single global handler for all password eyes
+  document.body.addEventListener("click", function(e){
+    const btn = e.target.closest(".toggle-eye");
+    if (!btn) return;
+    const targetId = btn.getAttribute("data-target");
+    const input = document.getElementById(targetId);
+    const icon = btn.querySelector("i");
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    if (icon) icon.className = show ? "fas fa-eye-slash" : "fas fa-eye";
+  });
+});
   </script>
 
   {% block scripts %}{% endblock %}

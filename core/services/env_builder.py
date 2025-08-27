@@ -191,4 +191,20 @@ def default_helpers() -> Dict[str, Any]:
     def clamp(x, lo, hi): 
         return max(lo, min(hi, x))
 
-    return {"math": math, "now_tz": now_tz, "in_session_now": in_session_now, "clamp": clamp}
+    def xts_segment_for(account_id: int, logical_key: str = "NSE_EQ") -> int:
+        """
+        Look up XTS segment for a given BrokerAccount id and logical exchange key.
+        Useful for tools outside adapters.
+        """
+        from core.models import BrokerAccount
+        from core.services.brokers.exchanges import resolve_xts_segment_for_account
+        acc = BrokerAccount.objects.get(id=account_id)
+        return resolve_xts_segment_for_account(acc, default_logical_key=logical_key)
+
+    return {
+        "math": math,
+        "now_tz": now_tz,
+        "in_session_now": in_session_now,
+        "clamp": clamp,
+        "xts_segment_for": xts_segment_for,  # <— new (optional)
+    }    
