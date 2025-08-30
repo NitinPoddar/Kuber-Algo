@@ -5,6 +5,13 @@ document.addEventListener('udv:changed', refreshAllStrikeTargetUDVOptions);
 
 // And run again right before we first render legs if you prefer:
 document.addEventListener('DOMContentLoaded', normalizeGlobals);
+function removeLeg(btn) {
+  const legBlock = btn.closest(".leg-block");
+  if (legBlock) {
+    legBlock.remove();
+  }
+}
+
 
 function getRowsContainer(hostOrId) {
   const host = (typeof hostOrId === 'string') ? document.getElementById(hostOrId) : hostOrId;
@@ -26,8 +33,7 @@ function getRowsContainer(hostOrId) {
       <strong>Condition</strong>
       <button type="button" class="delete" onclick="removeRootCondition('${host.id}', this)"></button>
     </div>
-    <div class="field">
-      <label class="label">Connector</label>
+    <div class="">
       <div class="select">
         <select class="group-connector">
           <option value="AND">AND</option>
@@ -137,8 +143,7 @@ function ensureGroup(containerId) {
       <strong>Condition</strong>
       <button type="button" class="delete" onclick="removeRootCondition('${containerId}', this)"></button>
     </div>
-    <div class="field">
-      <label class="label">Connector</label>
+    <div class="">
       <div class="select">
         <select class="group-connector">
           <option value="AND">AND</option>
@@ -178,7 +183,7 @@ function nextLegIndex() {
 }
 
 // PUBLIC: called by your “Add Leg” button
-function addLeg() {
+window.addLeg = function(){
   normalizeGlobals();
 
   const container = document.getElementById("legsContainer");
@@ -193,8 +198,12 @@ function addLeg() {
   legDiv.classList.add("box", "leg-block", "mt-5");
 
   // Build HTML for a complete leg
-  legDiv.innerHTML = `
+  legDiv.innerHTML = ` <div class="is-flex is-justify-content-space-between is-align-items-center">
     <h2 class="subtitle">Leg ${legIndex + 1}</h2>
+    <button type="button" class="delete is-large" 
+            style="margin-left;" 
+            onclick="removeLeg(this)"></button>
+  </div>
 
     <!-- 1) Exchange Segment -->
     <div class="field">
@@ -236,48 +245,53 @@ function addLeg() {
     </div>
 
     <!-- Expiry -->
-    <div class="field">
+    
+    <div class="field expiry-field">
       <label class="label">Expiry</label>
       <div class="select">
-        <select name="expiry_date[]" id="expiry_${legIndex}" required></select>
-      </div>
-    </div>
-
-    <!-- Strike mode -->
-    <div class="field">
-      <label class="label">Strike Mode</label>
-      <div class="select">
-        <select name="strike_kind[]" id="strike_kind_${legIndex}" onchange="toggleStrikeMode(${legIndex})" required>
-          <option value="ABS" selected>Absolute</option>
-          <option value="ATM">ATM</option>
-          <option value="OTM">OTM (by target)</option>
+        <select name="expiry_date[]" id="expiry_${legIndex}" required>
+        <option value="" disabled selected hidden>Select Expiry Date</option>
         </select>
       </div>
     </div>
 
-    <!-- ABS strike dropdown -->
-    <div class="field" id="strike_abs_wrap_${legIndex}">
-      <label class="label">Strike</label>
-      <div class="select">
-        <select name="strike_price[]" id="strike_${legIndex}" required></select>
+    <div class="strike-wrapper box p-3 mb-3" id="strike_wrap_${legIndex}">
+    <!-- Strike mode -->
+    
+        <div class="field">
+          <label class="label">Strike Mode</label>
+          <div class="select">
+            <select name="strike_kind[]" id="strike_kind_${legIndex}" onchange="toggleStrikeMode(${legIndex})" required>
+              <option value="ABS" selected>Absolute</option>
+              <option value="ATM">ATM</option>
+              <option value="OTM">OTM (by target)</option>
+            </select>
+          </div>
+        </div>
+    
+        <!-- ABS strike dropdown -->
+        <div class="field" id="strike_abs_wrap_${legIndex}">
+          <label class="label">Strike</label>
+          <div class="select">
+            <select name="strike_price[]" id="strike_${legIndex}" required></select>
+          </div>
+        </div>
+    
+        <!-- ATM/OTM target -->
+       <div class="field" id="strike_target_wrap_${legIndex}" style="display:none;">
+      <label class="label">Target</label>
+      <div class="select is-fullwidth">
+        <select name="strike_target[]" id="strike_target_${legIndex}"
+                onchange="onStrikeTargetChange(${legIndex})">
+          <!-- options injected by refreshStrikeTargetUDVOptionsFor -->
+        </select>
       </div>
+      <input class="input mt-2" type="number" step="1"
+             name="strike_target_custom[]" id="strike_target_custom_${legIndex}"
+             style="display:none;" placeholder="e.g. 200">
     </div>
 
-    <!-- ATM/OTM target -->
-   <div class="field" id="strike_target_wrap_${legIndex}" style="display:none;">
-  <label class="label">Target</label>
-  <div class="select is-fullwidth">
-    <select name=""strike_target[]" id="strike_target_${legIndex}"
-            onchange="onStrikeTargetChange(${legIndex})">
-      <!-- options injected by refreshStrikeTargetUDVOptionsFor -->
-    </select>
-  </div>
-  <input class="input mt-2" type="number" step="1"
-         name="strike_target_custom[]" id="strike_target_custom_${legIndex}"
-         style="display:none;" placeholder="e.g. 200">
 </div>
-
-
 
     <!-- Option / Direction / Order -->
     <div class="field">
@@ -324,6 +338,18 @@ function addLeg() {
       <div id="exit_conditions_${legIndex}" class="condition-group"></div>
       <button type="button" class="button is-small is-link mt-2"
               onclick="addRootCondition('exit_conditions_${legIndex}', this)">➕ Condition</button>
+    </div>
+    <div class="field">
+      <label class="label">Repair Conditions</label>
+      <div id="repair_conditions_${legIndex}" class="condition-group"></div>
+      <button type="button" class="button is-small is-link mt-2"
+              onclick="addRootCondition('repair_conditions_${legIndex}', this)">➕ Condition</button>
+    </div>
+    <div class="field">
+      <label class="label">Universal Exit Conditions</label>
+      <div id="universal_exit_conditions_${legIndex}" class="condition-group"></div>
+      <button type="button" class="button is-small is-link mt-2"
+              onclick="addRootCondition('universal_exit_conditions_${legIndex}', this)">➕ Condition</button>
     </div>
   `;
 
@@ -436,9 +462,8 @@ function addConditionGroup(containerId) {
       <strong>Condition Group</strong>
       <button type="button" class="delete" onclick="this.closest('.nested-condition').remove()"></button>
     </div>
-    <div class="field">
-      <label class="label">Connector</label>
-      <div class="select">
+    <div class="">
+       <div class="select">
         <select class="group-connector">
           <option value="AND">AND</option>
           <option value="OR">OR</option>
@@ -569,9 +594,8 @@ function addSubGroupToCondition(button) {
       <strong>Nested Subgroup</strong>
       <button type="button" class="delete" onclick="removeSubGroup(this)"></button>
     </div>
-    <div class="field">
-      <label class="label">Connector</label>
-      <div class="select">
+    <div class="">
+       <div class="">
         <select class="group-connector">
           <option value="AND">AND</option>
           <option value="OR">OR</option>
@@ -619,33 +643,99 @@ function removeSubGroup(deleteBtn) {
   }
 }
 function extractConditions(container) {
-  // 1) Work inside the current group's .conditions without creating UI
+  // 1) Get the rows container
+  let rowsContainer;
+  if (container.classList.contains("conditions")) {
+    rowsContainer = container;
+  } else {
+    rowsContainer = container.querySelector(":scope > .nested-condition > .conditions");
+  }
+  if (!rowsContainer) return { connector: "AND", conditions: [] };
+
+  // 2) Group connector (AND/OR)
+  const groupWrap = rowsContainer.closest(".nested-condition");
+  const groupConnector = groupWrap?.querySelector(".group-connector")?.value || "AND";
+
+  const conditions = [];
+
+  // 3) Loop over direct rows
+  rowsContainer.querySelectorAll(":scope > .condition-row").forEach(row => {
+    const lhsVar = row.querySelector(".condition-variable")?.value?.trim();
+    const operator = row.querySelector(".condition-operator")?.value || "==";
+    const rhsMode = row.querySelector(".rhs-mode")?.value || "value";
+
+    // --- LHS parameters ---
+    const lhsParams = {};
+    row.querySelectorAll(":scope > .condition-parameters input, :scope > .condition-parameters select")
+      .forEach(p => {
+        const key = p.dataset.paramKey || p.name.split("_").pop();
+        if (p.value !== "") lhsParams[key] = p.value;
+      });
+
+    // --- RHS ---
+    let rhs;
+    if (rhsMode === "variable") {
+      const rhsVar = row.querySelector(".rhs-variable-dropdown")?.value || "";
+      const rhsParams = {};
+      row.querySelectorAll(".rhs-input .condition-parameters input, .rhs-input .condition-parameters select")
+        .forEach(p => {
+          const key = p.dataset.paramKey || p.name.split("_").pop();
+          if (p.value !== "") rhsParams[key] = p.value;
+        });
+      rhs = { type: "variable", name: rhsVar, parameters: rhsParams };
+    } else {
+      const val = row.querySelector(".condition-value")?.value || "";
+      rhs = { type: "value", value: val };
+    }
+
+    const cond = {
+      lhs: lhsVar ? { name: lhsVar, parameters: lhsParams } : undefined,
+      operator,
+      rhs,
+      children: []
+    };
+
+    // --- Children (subgroups under this row) ---
+    row.querySelectorAll(":scope > .nested-condition > .conditions").forEach(subCont => {
+      const kids = extractConditions(subCont);
+      if (kids.conditions && kids.conditions.length) {
+        cond.children.push(kids); // push subgroup as a group object
+      }
+    });
+
+    conditions.push(cond);
+  });
+
+  // 4) Always return group object
+  return { connector: groupConnector, conditions };
+}
+
+function extractConditions1(container) {
+  // 1) Find the rows container
   let rowsContainer;
   if (container.classList.contains('conditions')) {
     rowsContainer = container;
   } else {
     rowsContainer = container.querySelector(':scope > .nested-condition > .conditions');
   }
-  if (!rowsContainer) return [];
+  if (!rowsContainer) return null;
 
-  // 2) Connector is defined at the group level
+  // 2) Connector for this group
   const groupWrap = rowsContainer.closest('.nested-condition');
   const groupConnector = groupWrap?.querySelector('.group-connector')?.value || 'AND';
 
   const conditions = [];
 
-  // 3) Only pick DIRECT rows of THIS group (no nested!)
+  // 3) Direct rows only
   rowsContainer.querySelectorAll(':scope > .condition-row').forEach(row => {
-    // LHS
     const variable = row.querySelector('.condition-variable')?.value?.trim();
-    if (!variable) return; // skip empty rows
+    if (!variable) return;
 
     const operator = row.querySelector('.condition-operator')?.value || '==';
 
-    // LHS parameters (only from this row)
-    const lhsParamDiv = row.querySelector(':scope > .condition-parameters');
+    // LHS params
     const lhsParams = {};
-    (lhsParamDiv ? lhsParamDiv.querySelectorAll('input, select') : []).forEach(p => {
+    row.querySelectorAll(':scope > .condition-parameters input, :scope > .condition-parameters select').forEach(p => {
       const key = p.dataset.paramKey || p.name.split('_').pop();
       if (p.value !== '') lhsParams[key] = p.value;
     });
@@ -655,38 +745,41 @@ function extractConditions(container) {
     let rhs;
     if (rhsMode === 'variable') {
       const rhsVar = row.querySelector('.rhs-variable-dropdown')?.value || '';
-      const rhsParamDiv = row.querySelector('.rhs-input .condition-parameters');
       const rhsParams = {};
-      (rhsParamDiv ? rhsParamDiv.querySelectorAll('input, select') : []).forEach(p => {
+      row.querySelectorAll('.rhs-input .condition-parameters input, .rhs-input .condition-parameters select').forEach(p => {
         const key = p.dataset.paramKey || p.name.split('_').pop();
         if (p.value !== '') rhsParams[key] = p.value;
       });
       rhs = { type: 'variable', name: rhsVar, parameters: rhsParams };
     } else {
-      const val = row.querySelector('.condition-value')?.value || '';
-      rhs = { type: 'value', value: val };
+      rhs = { type: 'value', value: row.querySelector('.condition-value')?.value || '' };
     }
 
+    // Leaf condition object
     const cond = {
       lhs: { name: variable, parameters: lhsParams },
       operator,
-      rhs,
-      connector: groupConnector, // stamp the group's AND/OR
-      children: []
+      rhs
     };
 
-    // 4) Recurse ONLY into direct subgroups of THIS row
+    // Recurse into subgroups under this row
     row.querySelectorAll(':scope > .nested-condition > .conditions').forEach(subCont => {
-      const kids = extractConditions(subCont);
-      if (kids.length) cond.children.push(...kids);
+      const subTree = extractConditions(subCont);
+      if (subTree) {
+        // instead of children[], push the whole subgroup
+        conditions.push(subTree);
+      }
     });
 
     conditions.push(cond);
   });
 
-  return conditions;
+  // 4) Wrap into group object
+  return {
+    connector: groupConnector,
+    conditions
+  };
 }
-
 
 function addRootCondition(containerId, button) {
   const container = document.getElementById(containerId);
@@ -701,8 +794,7 @@ function addRootCondition(containerId, button) {
       <strong>Condition</strong>
       <button type="button" class="delete" onclick="removeRootCondition('${containerId}', this)"></button>
     </div>
-    <div class="field">
-      <label class="label">Connector</label>
+    <div class="">
       <div class="select">
         <select class="group-connector">
           <option value="AND">AND</option>
@@ -736,224 +828,155 @@ function removeRootCondition(containerId, deleteBtn) {
     parent.appendChild(newBtn);
   }
 }
-function restoreConditionTree(containerIdOrEl, conditions) {
-  const host = (typeof containerIdOrEl === 'string') ? document.getElementById(containerIdOrEl) : containerIdOrEl;
+function restoreConditionTree(containerIdOrEl, conditions, groupConnector = "AND") {
+  const host = (typeof containerIdOrEl === "string")
+    ? document.getElementById(containerIdOrEl)
+    : containerIdOrEl;
   if (!host) return;
 
-  // Work inside this group's .conditions container (create root group if needed)
   const rowsContainer = getRowsContainer(host);
   if (!rowsContainer) return;
 
-  // Clear only direct rows of THIS group
-  rowsContainer.querySelectorAll(':scope > .condition-row').forEach(r => r.remove());
+  console.log("Restoring", conditions.length, "conditions into", host.id);
 
-  // Set the group connector from the first cond, if present
-  const groupWrap = rowsContainer.closest('.nested-condition');
-  if (groupWrap && conditions?.length) {
-    const connSel = groupWrap.querySelector('.group-connector');
-    if (connSel) connSel.value = conditions[0].connector || 'AND';
+  // Clear existing rows
+  rowsContainer.querySelectorAll(":scope > .condition-row").forEach(r => r.remove());
+
+  // Set group connector (if nested group)
+  const groupWrap = rowsContainer.closest(".nested-condition");
+  if (groupWrap) {
+    const connSel = groupWrap.querySelector(".group-connector");
+    if (connSel) connSel.value = groupConnector || "AND";
   }
 
-  conditions.forEach((cond, idx) => {
-    // Add a fresh row to THIS group
-    addConditionRow(rowsContainer);   // pass element, not id
-    const row = rowsContainer.querySelector(':scope > .condition-row:last-of-type');
+  conditions.forEach(cond => {
+    // --- CASE 1: Pure subgroup wrapper (no lhs, just {connector, conditions}) ---
+    if (cond && cond.conditions && Array.isArray(cond.conditions) && !cond.lhs) {
+      addConditionRow(rowsContainer);
+      const row = rowsContainer.querySelector(":scope > .condition-row:last-of-type");
+      if (!row) return;
+
+      const addSubBtn = row.querySelector(".button.is-small.is-warning");
+      if (addSubBtn) {
+        addSubGroupToCondition(addSubBtn);
+        const subCont = row.querySelector(":scope > .nested-condition > .conditions");
+        if (subCont) {
+          restoreConditionTree(subCont, cond.conditions, cond.connector || "AND");
+        }
+      }
+      return; // skip normal row handling
+    }
+
+    // --- CASE 2: Normal row (with optional children) ---
+    addConditionRow(rowsContainer);
+    const row = rowsContainer.querySelector(":scope > .condition-row:last-of-type");
     if (!row) return;
 
-    // LHS variable + params
-    const lhsSel = row.querySelector('.condition-variable');
+    // --- LHS ---
+    const lhsSel = row.querySelector(".condition-variable");
     if (lhsSel) {
-      if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
-        $(lhsSel).val(cond.lhs?.name || '').trigger('change.select2');
+      if (typeof $ !== "undefined" && $.fn && $.fn.select2) {
+        $(lhsSel).val(cond.lhs?.name || "").trigger("change.select2");
       } else {
-        lhsSel.value = cond.lhs?.name || '';
-        lhsSel.dispatchEvent(new Event('change', { bubbles: true }));
+        lhsSel.value = cond.lhs?.name || "";
+        lhsSel.dispatchEvent(new Event("change", { bubbles: true }));
       }
       renderConditionVariableParams(lhsSel);
 
-      // symbol first
-      const symSel = row.querySelector(':scope > .condition-parameters .symbol-dropdown');
+      // Symbol param
+      const symSel = row.querySelector(":scope > .condition-parameters .symbol-dropdown");
       const symVal = cond.lhs?.parameters?.symbol;
       if (symSel && symVal) {
-        initSelect2(`#${symSel.id || (symSel.id = 'sym_'+Math.random().toString(36).slice(2,8))}`, "Select symbol");
-        if (![...symSel.options].some(o => o.value === symVal)) symSel.add(new Option(symVal, symVal, true, true));
-        if (typeof $ !== 'undefined') $(symSel).val(symVal).trigger('change.select2');
+        if (!symSel.id) symSel.id = "sym_" + Math.random().toString(36).slice(2, 8);
+        initSelect2(`#${symSel.id}`, "Select symbol");
+
+        if (![...symSel.options].some(o => o.value === symVal)) {
+          symSel.add(new Option(symVal, symVal, true, true));
+        }
+        if (typeof $ !== "undefined") {
+          $(symSel).val(symVal).trigger("change.select2");
+        }
       }
-      // other params
+
+      // Other LHS params
       Object.entries(cond.lhs?.parameters || {}).forEach(([k, v]) => {
-        if (k === 'symbol') return;
+        if (k === "symbol") return;
         const inp = row.querySelector(`:scope > .condition-parameters [name$="${k}"]`);
         if (inp) inp.value = v;
       });
     }
 
-    // Operator
-    const opSel = row.querySelector('.condition-operator');
-    if (opSel) opSel.value = cond.operator || '==';
+    // --- Operator ---
+    const opSel = row.querySelector(".condition-operator");
+    if (opSel) opSel.value = cond.operator || "==";
 
-    // RHS
-    const rhsModeSel = row.querySelector('.rhs-mode');
+    // --- RHS ---
+    const rhsModeSel = row.querySelector(".rhs-mode");
     if (rhsModeSel) {
-      rhsModeSel.value = cond.rhs?.type || 'value';
-      rhsModeSel.dispatchEvent(new Event('change', { bubbles: true }));
+      rhsModeSel.value = cond.rhs?.type || "value";
+      rhsModeSel.dispatchEvent(new Event("change", { bubbles: true }));
 
-      if (cond.rhs?.type === 'value') {
-        const valInp = row.querySelector('.condition-value');
-        if (valInp) valInp.value = cond.rhs.value ?? '';
+      if (cond.rhs?.type === "value") {
+        const valInp = row.querySelector(".condition-value");
+        if (valInp) valInp.value = cond.rhs.value ?? "";
       } else {
-        const rhsVarSelect = row.querySelector('.rhs-variable-dropdown');
+        const rhsVarSelect = row.querySelector(".rhs-variable-dropdown");
         if (rhsVarSelect) {
-          if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
-            $(rhsVarSelect).val(cond.rhs?.name || '').trigger('change.select2');
+          if (typeof $ !== "undefined" && $.fn && $.fn.select2) {
+            $(rhsVarSelect).val(cond.rhs?.name || "").trigger("change.select2");
           } else {
-            rhsVarSelect.value = cond.rhs?.name || '';
-            rhsVarSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            rhsVarSelect.value = cond.rhs?.name || "";
+            rhsVarSelect.dispatchEvent(new Event("change", { bubbles: true }));
           }
           renderConditionVariableParams(rhsVarSelect);
+        }
 
-          // RHS symbol
-          const rhsSym = row.querySelector('.rhs-input .symbol-dropdown');
-          const rhsSymVal = cond.rhs?.parameters?.symbol;
-          if (rhsSym && rhsSymVal) {
-            initSelect2(`#${rhsSym.id || (rhsSym.id = 'rsym_'+Math.random().toString(36).slice(2,8))}`, "Select symbol");
-            if (![...rhsSym.options].some(o => o.value === rhsSymVal)) rhsSym.add(new Option(rhsSymVal, rhsSymVal, true, true));
-            if (typeof $ !== 'undefined') $(rhsSym).val(rhsSymVal).trigger('change.select2');
+        // RHS symbol param
+        const rhsSym = row.querySelector(".rhs-input .symbol-dropdown");
+        const rhsSymVal = cond.rhs?.parameters?.symbol;
+        if (rhsSym && rhsSymVal) {
+          if (!rhsSym.id) rhsSym.id = "rsym_" + Math.random().toString(36).slice(2, 8);
+          initSelect2(`#${rhsSym.id}`, "Select symbol");
+
+          if (![...rhsSym.options].some(o => o.value === rhsSymVal)) {
+            rhsSym.add(new Option(rhsSymVal, rhsSymVal, true, true));
           }
-          // other RHS params
-          Object.entries(cond.rhs?.parameters || {}).forEach(([k, v]) => {
-            if (k === 'symbol') return;
-            const inp = row.querySelector(`.rhs-input [name$="${k}"]`);
-            if (inp) inp.value = v;
+          if (typeof $ !== "undefined") {
+            $(rhsSym).val(rhsSymVal).trigger("change.select2");
+          }
+        }
+
+        // Other RHS params
+        Object.entries(cond.rhs?.parameters || {}).forEach(([k, v]) => {
+          if (k === "symbol") return;
+          const inp = row.querySelector(`.rhs-input [name$="${k}"]`);
+          if (inp) inp.value = v;
+        });
+      }
+    }
+
+    // --- CASE 2b: Children (rows or subgroups) ---
+    if (Array.isArray(cond.children) && cond.children.length) {
+      const addSubBtn = row.querySelector(".button.is-small.is-warning");
+      if (addSubBtn) {
+        addSubGroupToCondition(addSubBtn);
+        const subCont = row.querySelector(":scope > .nested-condition > .conditions");
+        if (subCont) {
+          cond.children.forEach(child => {
+            if (child.conditions && Array.isArray(child.conditions)) {
+              // Group child
+              restoreConditionTree(subCont, child.conditions, child.connector || "AND");
+            } else {
+              // Row child
+              restoreConditionTree(subCont, [child], cond.connector || "AND");
+            }
           });
         }
       }
     }
-
-    // Nested children → create ONE subgroup under THIS row and recurse into its .conditions
-    if (Array.isArray(cond.children) && cond.children.length) {
-      const addSubBtn = row.querySelector('.button.is-small.is-warning');
-      if (addSubBtn) {
-        addSubGroupToCondition(addSubBtn);
-        const subCont = row.querySelector(':scope > .nested-condition > .conditions');
-        if (subCont) restoreConditionTree(subCont, cond.children); // pass element
-      }
-    }
   });
 }
 
-function restoreConditionTreeOld(containerId, conditions) {
-  const container = document.getElementById(containerId);
-  // “Open” the root condition group if it isn’t already
-  const rootBtn = container.querySelector('button[data-root-btn]');
-  if (rootBtn) rootBtn.click();
-
-  const target = container.querySelector('.conditions');
-  if (!target) return;
-
-  conditions.forEach(cond => {
-    // 1) Create the row wrapper
-    const row = document.createElement('div');
-    row.className = 'condition-row is-flex is-align-items-center mb-2';
-
-    // 2) LHS variable dropdown
-    const varDropdown = document.createElement('select');
-    varDropdown.className = 'condition-variable inline-variable-dropdown';
-    varDropdown.innerHTML = getAllVariableOptionsHTML();
-    varDropdown.value = cond.lhs.name;
-    varDropdown.onchange = () => renderConditionVariableParams(varDropdown);
-    row.appendChild(wrapElement(varDropdown));
-
-    // 3) LHS parameters container
-    const paramWrapper = document.createElement('div');
-    paramWrapper.className = 'condition-parameters mr-2';
-    row.appendChild(paramWrapper);
-
-    // populate any saved LHS params
-    renderConditionVariableParams(varDropdown);
-    for (const [key, val] of Object.entries(cond.lhs.parameters || {})) {
-      const input = paramWrapper.querySelector(`[name$="${key}"]`);
-      if (input) input.value = val;
-    }
-
-    // 4) Operator dropdown
-    const opSelect = document.createElement('select');
-    opSelect.className = 'condition-operator';
-    opSelect.innerHTML = `
-      <option value=">">&gt;</option>
-      <option value="<">&lt;</option>
-      <option value=">=">&gt;=</option>
-      <option value="<=">&lt;=</option>
-      <option value="==">==</option>
-      <option value="!=">!=</option>
-    `;
-    opSelect.value = cond.operator;
-    row.appendChild(wrapElement(opSelect));
-
-    // 5) RHS-mode selector
-    const rhsModeSelect = document.createElement('select');
-    rhsModeSelect.className = 'rhs-mode';
-    rhsModeSelect.innerHTML = `
-      <option value="value">Value</option>
-      <option value="variable">Variable</option>
-    `;
-    rhsModeSelect.value = cond.rhs.type;
-    row.appendChild(wrapElement(rhsModeSelect));
-
-    // 6) RHS text-input
-    const rhsValueInput = document.createElement('input');
-    rhsValueInput.type = 'text';
-    rhsValueInput.className = 'condition-value input';
-    rhsValueInput.style.width = '100px';
-    rhsValueInput.value = cond.rhs.type === 'value' ? cond.rhs.value : '';
-    row.appendChild(rhsValueInput);
-
-    // 7) RHS variable dropdown wrapper
-    const rhsVarWrapper = document.createElement('div');
-    rhsVarWrapper.className = 'rhs-input';
-    // hide or show based on saved type
-    rhsVarWrapper.style.display = cond.rhs.type === 'variable' ? '' : 'none';
-    const rhsVarSelect = document.createElement('select');
-    rhsVarSelect.className = 'rhs-variable-dropdown';
-    rhsVarSelect.innerHTML = getAllVariableOptionsHTML();
-    rhsVarSelect.value = cond.rhs.name || '';
-    rhsVarSelect.onchange = () => renderConditionVariableParams(rhsVarSelect);
-    rhsVarWrapper.appendChild(rhsVarSelect);
-    row.appendChild(rhsVarWrapper);
-
-    // 8) Fire a “change” so the global delegate toggles visibility
-    rhsModeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-
-    // 9) Delete & Subgroup buttons
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete';
-    deleteBtn.type = 'button';
-    deleteBtn.onclick = () => row.remove();
-    row.appendChild(deleteBtn);
-
-    const subgroupBtn = document.createElement('button');
-    subgroupBtn.className = 'button is-small is-warning ml-2';
-    subgroupBtn.type = 'button';
-    subgroupBtn.textContent = '➕ Subgroup';
-    subgroupBtn.onclick = () => addSubGroupToCondition(subgroupBtn);
-    row.appendChild(subgroupBtn);
-
-    // 10) Apply Select2 on any inline-variable-dropdowns
-    $(row).find('.inline-variable-dropdown').select2({
-      width: 'auto',
-      placeholder: 'Select Variable'
-    });
-
-    // 11) Add the row to the DOM
-    target.appendChild(row);
-
-    // 12) Recursively restore any nested children
-    if (cond.children?.length) {
-      addSubGroupToCondition(subgroupBtn);
-      const subContainer = row.querySelector('.nested-condition .conditions');
-      restoreConditionTree(subContainer.id, cond.children);
-    }
-  });
-}
 
   // Expression builder param renderer (used by addExpressionVariable)
 function renderInlineVariableParams(selectEl, index) {
@@ -1157,6 +1180,5 @@ function wrapElement(el) {
   wrapper.appendChild(el);
   return wrapper;
 }
-
 
 

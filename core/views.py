@@ -29,7 +29,7 @@ from django.db.models import Sum
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
 from django.http import HttpResponseBadRequest
 from django.contrib.auth import update_session_auth_hash
-
+from django.core.exceptions import ValidationError
 User = get_user_model()
 
 # If not already imported:
@@ -66,7 +66,8 @@ from .models import (
     OTP,
     PendingSignup,
     PendingContactChange,
-    Exchange
+    Exchange,
+    AlgoRule
     )
 
 # core/views.py
@@ -1723,6 +1724,54 @@ def save_condition_structure(algo_logic, conditions, condition_type='entry', par
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
+import uuid
+
+def _normalize_json_field(value, default=None):
+    """
+    Ensure a field is stored as a dict (not string).
+    """
+    if default is None:
+        default = {}
+    if value is None:
+        return default
+    if isinstance(value, dict):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+def _save_rules_for_algo(algo, legs, rules_json):
+    """Save rules array from frontend into AlgoRule rows."""
+    AlgoRule.objects.filter(algo=algo).delete()
+    try:
+        rules = json.loads(rules_json or "[]")
+    except Exception:
+        rules = []
+
+    for r in rules:
+        leg = None
+        if r.get("scope") == "LEG":
+            # Match leg by index if provided
+            idx = r.get("leg_index")
+            if idx is not None and idx < len(legs):
+                leg = legs[idx]
+
+        AlgoRule.objects.create(
+            algo=algo,
+            leg=leg,
+            rule_id=r.get("rule_id") or str(uuid.uuid4()),
+            rule_type=r.get("rule_type", "ENTRY"),
+            scope=r.get("scope", "LEG"),
+            trigger_event=r.get("trigger_event", "ON_CONDITION"),
+            priority=r.get("priority", 50),
+            condition_tree=_normalize_json_field(r.get("condition_tree"), {}),
+            action_type=r.get("action_type", "PLACE_ORDER"),
+            action_params=_normalize_json_field(r.get("action_params"), {}),
+            policy=_normalize_json_field(r.get("policy"), {"repeatable": True}),
+            is_active=True,
+        )
+
+
 
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -1783,7 +1832,7 @@ def add_algo(request: HttpRequest) -> HttpResponse:
             if sel == "__custom__":
                 return (custom_targets[i] if i < len(custom_targets) else "").strip()
             return (sel or "").strip()
-        
+        legs = []
         n = len(instruments)
         for i in range(n):
             strike_kind = (strike_kinds[i] if i < len(strike_kinds) and strike_kinds[i] else 'ABS')
@@ -1803,23 +1852,16 @@ def add_algo(request: HttpRequest) -> HttpResponse:
                 strike_kind=strike_kind,
                 strike_target=strike_target_val,
             )
-
+            try:
+                logic.full_clean()
+            except ValidationError as e:
+                messages.error(request, f"Leg {i+1} error: {e.message_dict}")
+                raise  # stops tran
+            legs.append(logic)
             # Entry conditions
-            try:
-                entry_json = request.POST.get(f"entry_conditions_json_{i}", "[]")
-                entry_data = json.loads(entry_json)
-                save_condition_structure(logic, entry_data, condition_type="entry")
-            except json.JSONDecodeError as e:
-                print(f"[Entry Condition Error] Leg {i+1}: {e}")
-
-            # Exit conditions
-            try:
-                exit_json = request.POST.get(f"exit_conditions_json_{i}", "[]")
-                exit_data = json.loads(exit_json)
-                save_condition_structure(logic, exit_data, condition_type="exit")
-            except json.JSONDecodeError as e:
-                print(f"[Exit Condition Error] Leg {i+1}: {e}")
-
+        rules_json = request.POST.get("rules_json")
+        print("RAW RULES_JSON from POST:", request.POST.get("rules_json"))
+        _save_rules_for_algo(algo, legs, rules_json)
         messages.success(request, "✅ Algorithm created successfully")
         return redirect("algo_list")
 
@@ -1920,13 +1962,12 @@ def edit_algo(request: HttpRequest, id: int) -> HttpResponse:
             if sel == "__custom__":
                 return (custom_targets[i] if i < len(custom_targets) else "").strip()
             return (sel or "").strip()
-        
+        legs=[]
         n = len(instruments)
         for i in range(n):
             strike_kind = (strike_kinds[i] if i < len(strike_kinds) and strike_kinds[i] else 'ABS')
             strike_target_val = normalized_target(i) if strike_kind == 'OTM' else ''
-            for i in range(n):
-                logic = AlgorithmLogic.objects.create(
+            logic = AlgorithmLogic.objects.create(
                 algo=algo,
                 num_stocks=i + 1,
                 instrument_name=instruments[i],
@@ -1941,24 +1982,13 @@ def edit_algo(request: HttpRequest, id: int) -> HttpResponse:
                 strike_kind=(strike_kinds[i] if i < len(strike_kinds) and strike_kinds[i] else "ABS"),
                 strike_target=(strike_targets[i] if i < len(strike_targets) else "") or "",
             )
-
-            # Entry conditions
-            try:
-                entry_json = request.POST.get(f"entry_conditions_json_{i}", "[]")
-                entry_data = json.loads(entry_json)
-                save_condition_structure(logic, entry_data, condition_type="entry")
-            except json.JSONDecodeError as e:
-                print(f"[Entry Condition Error] Leg {i+1}: {e}")
-
-            # Exit conditions
-            try:
-                exit_json = request.POST.get(f"exit_conditions_json_{i}", "[]")
-                exit_data = json.loads(exit_json)
-                save_condition_structure(logic, exit_data, condition_type="exit")
-            except json.JSONDecodeError as e:
-                print(f"[Exit Condition Error] Leg {i+1}: {e}")
-
-        messages.success(request, "✅ Algorithm updated successfully")
+            logic.full_clean()
+            legs.append(logic)
+         # Entry conditions
+        rules_json = request.POST.get("rules_json")
+        print("RAW RULES_JSON from POST:", request.POST.get("rules_json"))
+        _save_rules_for_algo(algo, legs, rules_json)
+        messages.success(request, "✅ Algorithm created successfully")
         return redirect("algo_list")
 
     # --- GET (edit) ---
@@ -2007,10 +2037,26 @@ def edit_algo(request: HttpRequest, id: int) -> HttpResponse:
             "lot_size_snapshot": getattr(leg, "lot_size_snapshot", None),
             "strike_kind": getattr(leg, "strike_kind", "ABS"),
             "strike_target": getattr(leg, "strike_target", ""),
-            "entry_conditions": serialize_conditions(leg, "entry"),
-            "exit_conditions": serialize_conditions(leg, "exit"),
         })
-
+    # Rules
+    rules = []
+    for r in algo.rules.all():
+        rules.append({
+            "id": r.id,
+            "rule_id": r.rule_id,
+            "rule_type": r.rule_type,
+            "scope": r.scope,
+            "trigger_event": r.trigger_event,
+            "priority": r.priority,
+            # ✅ ensure dict, not string
+            "condition_tree": r.condition_tree if isinstance(r.condition_tree, dict) else json.loads(r.condition_tree or "{}"),
+            "action_type": r.action_type,
+            "action_params": r.action_params if isinstance(r.action_params, dict) else json.loads(r.action_params or "{}"),
+            "policy": r.policy if isinstance(r.policy, dict) else json.loads(r.policy or "{}"),
+            "leg_id": r.leg_id,
+            })
+    
+    
     return render(request, "algorelated/edit_algo.html", {
         "algo": algo,
         "is_edit_mode": True,
@@ -2022,7 +2068,8 @@ def edit_algo(request: HttpRequest, id: int) -> HttpResponse:
 
         "indicators_json": mark_safe(indicators_json),
         "user_vars_json": mark_safe(user_vars_json),
-        "legs_json": mark_safe(json.dumps(legs_data, cls=DjangoJSONEncoder)),
+        "legs_json": legs_data,
+        "rules_json": rules,
     })
 
 #--------Algo list-------#

@@ -10,6 +10,7 @@ import random
 import string
 import logging
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 class AlgoRule(models.Model):
     algo = models.ForeignKey("AlgoList", on_delete=models.CASCADE, related_name="rules")
@@ -448,7 +449,7 @@ class GlobalVariable(models.Model):
 
 class AlgoList(models.Model):
     algo_name = models.CharField(max_length=100, unique=True)
-    minimum_fund_reqd = models.IntegerField()
+    minimum_fund_reqd = models.DecimalField(max_digits=12, decimal_places=2, default=0) 
     algo_description = models.TextField()
 
     created_by = models.ForeignKey(
@@ -465,37 +466,58 @@ class AlgoList(models.Model):
     def __str__(self):
         return self.algo_name
 
+
 class AlgorithmLogic(models.Model):
     algo = models.ForeignKey(AlgoList, on_delete=models.CASCADE, related_name="legs")
     num_stocks = models.IntegerField()
     instrument_name = models.CharField(max_length=100)
-    exchange_segment = models.CharField(max_length=16, default='NFO')  # pick your default
+    exchange_segment = models.CharField(max_length=16, default='NFO')
     expiry_date = models.CharField(max_length=20)
     strike_price = models.CharField(max_length=20)
-    # models.py → class AlgorithmLogic
-    # position sizing
+
     lot_qty = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
-    lot_size_snapshot = models.PositiveIntegerField(null=True, blank=True)  # filled from InstrumentList on save
-    # strike selection mode
+    lot_size_snapshot = models.PositiveIntegerField(null=True, blank=True)
+
     STRIKE_KIND = (('ABS','Absolute'), ('ATM','ATM'), ('OTM','OTM'))
     strike_kind = models.CharField(max_length=8, choices=STRIKE_KIND, default='ABS')
-    strike_target = models.CharField(max_length=64, blank=True, default='')  # numeric points or UDV name
+    strike_target = models.CharField(max_length=64, blank=True, default='')  
 
     option_type = models.CharField(max_length=10)
 
-    # 🆕 Added fields for order direction and order type
     order_direction = models.CharField(
         max_length=10,
-        choices=[('Buy', 'Buy'), ('Sell', 'Sell')]
+        choices=[('BUY', 'Buy'), ('SELL', 'Sell')]
     )
     order_type = models.CharField(
         max_length=20,
         choices=[
-            ('Market', 'Market'),
-            ('Limit', 'Limit'),
-            ('LimitThenMarket', 'LimitThenMarket')
+            ('MARKET', 'Market'),
+            ('LIMIT', 'Limit'),
+            ('LIMITTHENMARKET', 'LimitThenMarket')
         ]
     )
+
+    def clean(self):
+        """
+        Ensure strike_target validity based on strike_kind.
+        """
+        errors = {}
+
+        if self.strike_kind == "OTM":
+            if not self.strike_target:
+                errors["strike_target"] = "OTM legs must define a strike_target."
+            else:
+                # Check if it's numeric
+                if not self.strike_target.isdigit():
+                    # Could be a UDV — allow alphanumeric + underscores
+                    import re
+                    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", self.strike_target):
+                        errors["strike_target"] = (
+                            "strike_target must be either a number or a valid variable name."
+                        )
+
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return f"Leg {self.num_stocks} - {self.instrument_name} - {self.option_type} - {self.order_direction}/{self.order_type}"

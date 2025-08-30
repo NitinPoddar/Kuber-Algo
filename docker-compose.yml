@@ -1,14 +1,17 @@
+# docker-compose.yml
+version: "3.9"
+
 services:
   db:
     image: postgres:16-alpine
     container_name: kuber_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: kuber
-      POSTGRES_USER: kuber
-      POSTGRES_PASSWORD: kuber
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kuber -d kuber"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,7 +30,7 @@ services:
   web:
     build: .
     container_name: kuber_web
-    command: gunicorn kuber.wsgi:application --bind 0.0.0.0:8000
+    command: python manage.py runserver 0.0.0.0:8000
     env_file: .env
     depends_on:
       db:
@@ -36,8 +39,9 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
+    # Make this path match your Dockerfile WORKDIR (see note below)
     volumes:
-      - .:/code
+      - .:/app:cached
 
 volumes:
   pg_data:

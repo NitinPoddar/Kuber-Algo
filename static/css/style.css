@@ -1,5 +1,5 @@
 /* =========================================================
-   KUBER � Desktop-first UI (Bulma friendly)
+   KUBER — Desktop-first UI (Bulma friendly)  (CLEAN FULL)
    ========================================================= */
 
 /* ---------- Design tokens ---------- */
@@ -66,329 +66,501 @@ h1.title{ font-weight: 700; letter-spacing: -0.02em; }
 /* ---------- Navbar ---------- */
 .navbar{ box-shadow: 0 2px 10px rgba(2,6,23,.05); }
 .navbar .navbar-item,
-.navbar .navbar-link{color: #00795c; }
-.navbar-item.has-text-white{
+.navbar .navbar-link{color: #000; }
+.navbar-item.has-text-black{
   font-family: "Poppins", sans-serif;
   font-weight: 500;
   letter-spacing: .3px;
-  color: #fff !important;
+  color: #000 !important;
 }
-.navbar-item.has-text-white:hover{ background:#00795c; }
+.navbar-item.has-text-white:hover{ background:#000; }
 .navbar-burger{ height: 3rem; width: 3rem; }
 .navbar-menu{ backdrop-filter: saturate(140%) blur(6px); }
+.navbar-link user-dropdown-trigger has-text-white{color: #000}
+ .navbar-link user-dropdown-trigger {color: #000}           
 .user-dropdown-trigger{
   border-radius: 999px;
-  background:#00795c;
-  color:#fff;
+  background:#000;
+  color:#000;
   padding:.4em .9em;
   font-size:.85rem;
   font-weight:500;
   font-family:"Poppins", sans-serif;
   display:flex; align-items:center; gap:5px;
 }
-.user-dropdown-trigger:hover{ background:#fff; }
+.user-dropdown-trigger:hover{background:#00795c; }
 .user-dropdown-item{ font-size:.85rem; }
 
-/* ---------- Boxes & large sections ---------- */
-.box{
+/* ---------- Cards & Sections ---------- */
+.box,.content-box{
+  background:#fff;
   border:1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:1.25rem;
 }
-#basicDetailsSection,
-#strategySection,
-#jsonPreviewBox{
-  background: var(--card-bg);
-  border: 1.5px solid var(--card-border);
-  border-radius: 14px;
-  padding: 1rem;
-  box-shadow: var(--card-shadow);
-  margin-top: 1rem;
+#basicDetailsSection,#strategySection,#jsonPreviewBox,#userConstantsContainer .box{
+  background:var(--card-bg);
+  border:1.5px solid var(--card-border);
+  border-radius:14px;
+  box-shadow:var(--card-shadow);
+  padding:1rem;
+  margin-top:1rem;
 }
 
-/* Leg blocks with accent rail */
+/* ---------- Leg block ---------- */
 .box.leg-block{
-  position: relative;
-  background: var(--card-bg);
-  border: 2px solid var(--card-border);
-  border-radius: 14px;
-  box-shadow: var(--card-shadow);
-  padding-top: .9rem;
-  display: grid;                              /* inner layout */
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 1rem;
-  row-gap: .75rem;
-}
-.box.leg-block > .subtitle{
-  margin-top:.2rem; margin-bottom:.75rem; font-weight:600;
+  position:relative;
+  background:var(--card-bg);
+  border:1.5px solid var(--card-border);
+  border-radius:14px;
+  box-shadow:var(--card-shadow);
+
+  display:grid;
+  grid-template-columns:repeat(2, minmax(320px, 1fr));
+  gap:1.25rem .9rem;
+  align-items:start;
+  padding:1rem;
+  margin-top:1rem;
 }
 .box.leg-block::before{
   content:"";
-  position:absolute; left:0; top:0; bottom:0;
-  width:4px; border-radius:14px 0 0 14px;
-  background: var(--leg-accent); opacity:.9;
+  position:absolute; left:0; top:0; bottom:0; width:4px;
+  border-radius:14px 0 0 14px;
+  background:var(--leg-accent);
+  opacity:.9;
 }
-/* Make Entry/Exit blocks span both columns inside each leg */
+.box.leg-block > .subtitle{ grid-column:1 / -1; margin-bottom:.25rem; }
+.box.leg-block .field{ margin:0 !important; }
+.box.leg-block .fields.is-grouped{ display:contents; }
+.box.leg-block *{ min-width:0; box-sizing:border-box; }
+
+/* Full-width builders inside leg */
 .box.leg-block .field:has([id^="entry_conditions_"]),
-.box.leg-block .field:has([id^="exit_conditions_"]){
-  grid-column: 1 / -1;
+.box.leg-block .field:has([id^="exit_conditions_"]),
+.box.leg-block .field[data-span="full"],
+.box.leg-block .field.is-fullwidth{ grid-column:1 / -1 !important; }
+/* ========== 1) MOBILE-FRIENDLY LAYOUT TWEAKS ========== */
+
+/* Legs container: stay full-width, allow easy stacking on phones */
+#legsContainer{
+  display: grid !important;
+  grid-auto-flow: row;
+  grid-template-columns: 1fr;           /* 1 per row by default */
+  gap: 1.25rem;
+  width: 100%;
+}
+@media (min-width: 1200px){
+  #legsContainer{ grid-template-columns: 1fr; } /* change to repeat(2, minmax(520px,1fr)) if you want 2-up on desktop */
+}
+/* Leg block inner grid collapses gracefully on small screens */
+.box.leg-block{ grid-template-columns: repeat(2, minmax(280px, 1fr)); }
+@media (max-width: 992px){
+  .box.leg-block{ grid-template-columns: 1fr !important; }
+  .box.leg-block .fields.is-grouped{ display: block; } /* stacked fields */
 }
 
-/* Subtle separators inside cards */
-#basicDetailsSection .field + .field,
-.box.leg-block .field + .field{
-  margin-top:.75rem; padding-top:.75rem; border-top:1px dashed #edf0f6;
+/* Condition row: stack intelligently on small screens */
+.condition-row{
+  display: grid !important;
+  grid-template-columns:
+    220px 1fr 80px 120px 1.4fr auto auto;
+  gap: 8px 12px;
+}
+@media (max-width: 992px){
+  .condition-row{
+    grid-template-columns: 1fr 1fr;      /* two columns */
+    grid-auto-flow: row;
+  }
+  /* make RHS wide & push subgroup under the row */
+  .condition-row .rhs-input,
+  .condition-row .condition-value,
+  .condition-row > .nested-condition{
+    grid-column: 1 / -1 !important;
+  }
+}
+@media (max-width: 520px){
+  /* phone: single column, everything stacks */
+  .condition-row{ grid-template-columns: 1fr; }
+  .condition-row > *{ grid-column: 1 / -1 !important; }
+  .inline-variable-dropdown,
+  .rhs-variable-dropdown,
+  .condition-parameters select,
+  .condition-parameters input{ width: 100% !important; }
 }
 
-/* User-defined variable cards */
-#userConstantsContainer .box{
-  background: var(--card-bg);
-  border: 1.5px solid var(--card-border);
-  border-radius: 12px;
-  box-shadow: 0 1px 6px rgba(0,0,0,.03);
+/* Select2: keep small-screen sanity */
+@media (max-width: 520px){
+  .select2-container{ width: 100% !important; }
+  .select2-selection__rendered{ line-height: 2.1rem !important; }
+  .select2-selection__arrow{ height: 2.1rem !important; }
 }
 
-/* ---------- Forms ---------- */
-.field{ margin-bottom:.9rem; }
-.label{ font-weight:600; font-size:.95rem; color:var(--brand-ink); }
-.input, .textarea, .select select{
-  border-radius: 10px;
-  border-color: var(--line);
+
+/* ========== 2) CONNECTOR RESTYLE (no blue slab) ========== */
+
+/* The wrapper .field that holds the connector select */
+.nested-condition > .field:has(.group-connector),
+.nested-condition > .field.connector-bar{
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .25rem .5rem;
+  margin: .5rem 0 .75rem;
+  background: transparent;                 /* remove blue block */
+  border: 0;                               /* no box border */
+  border-left: 4px solid var(--rail);      /* slim rail only */
+  border-radius: 0;
+  width:120px;
+}
+
+/* Make the AND/OR look like a compact chip */
+.nested-condition .group-connector{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  font: 600 0.85rem/1.9 Inter, system-ui, sans-serif;
+  padding: .2rem .6rem;
+  border: 1px solid rgba(94,92,230,.35);
+  border-radius: 999px;
+  background: rgba(94,92,230,.08);         /* subtle tint */
+  color: #27304a;
+  min-width: 90px;
+  width: 120px;
+  cursor: pointer;
+}
+
+/* If Bulma .select wrapper is present, neutralize its box look */
+.nested-condition .field:has(.group-connector) .select{
+  background: transparent;
+  border: 0;
   box-shadow: none;
 }
-.input:focus, .textarea:focus, .select select:focus{
-  border-color: var(--brand);
-  box-shadow: 0 0 0 .15rem rgba(37,99,235,.15);
+.nested-condition .field:has(.group-connector) .select select{
+  box-shadow: none;
+  background: transparent;                 /* let chip styles apply */
 }
-.help.is-danger{ margin-top:.35rem; }
-.button{ border-radius:10px; }
 
-/* ---------- Select2 polish ---------- */
-.select2-container{ width:100% !important; }
-.select2-selection{
-  min-height: 2.4rem !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 10px !important;
+/* Hover/focus states for nicer feel */
+.nested-condition .group-connector:hover{
+  background: rgba(94,92,230,.12);
 }
-.select2-selection__rendered{ line-height:2.3rem !important; padding-left:.75rem !important; }
-.select2-selection__arrow{ height:2.3rem !important; }
-.select2-dropdown{ border-color:var(--line) !important; border-radius:10px !important; }
-.select2-results__option{ padding:.55rem .75rem; font-size:.95rem; }
-.modal.is-active .select2-container{ z-index:9999 !important; }
-.select2-container--open{ z-index:9999 !important; } /* ensure above Bulma boxes */
-
-/* ---------- Condition Builder (desktop layout) ---------- */
-/* Group rail */
-.nested-condition{
-  position:relative;
-  border-left: 3px solid var(--rail);
-  padding-left: 12px;
-  margin-left: 8px;
-  border-radius: 10px;
-  background: transparent; /* rows provide tint */
+.nested-condition .group-connector:focus{
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(94,92,230,.25);
 }
-.nested-condition .nested-condition{ border-left-color: var(--rail-2); }
 
-/* Elbow line from rail to each row */
-.condition-row{ position:relative; }
+/* Deeper levels use lighter rail for clarity (keeps elbow lines too) */
+.nested-condition .nested-condition > .field:has(.group-connector){
+  border-left-color: var(--rail-2);
+}
+
+/* Keep elbow lines (tree clarity) */
 .condition-row::before{
   content:"";
-  position:absolute; left:-14px; top:1.2em; width:12px;
+  position:absolute;
+  left:0; top:1.2em; width:12px;
   border-top:2px solid var(--rail);
-  pointer-events:none; z-index:0;
 }
-.nested-condition .nested-condition .condition-row::before{ border-top-color: var(--rail-2); }
+.nested-condition .nested-condition .condition-row::before{
+  border-top-color: var(--rail-2);
+}
 
-/* Row card */
-.condition-row{
+/* ---------- Legs container: one block per row ---------- */
+#legsContainer{
+  display:grid !important;
+  grid-auto-flow:row;
+  grid-template-columns: 1fr;               /* default: one per row */
+  gap: 1.25rem;
+  width:100%;
+}
+@media (min-width: 1200px){
+  #legsContainer{ grid-template-columns: 1fr; } /* change to repeat(2, minmax(520px,1fr)) if you want 2-up on desktop */
+}
+#legsContainer > .leg-block,
+#legsContainer > .box.leg-block{
+  width:100%;
+  min-width:0;
+  margin:0;                                  /* the gap handles spacing */
+}
+/* ---------- Condition Builder ---------- */
+.nested-condition{
+  position:relative;
+  border-left:3px solid var(--rail);
+  padding-left:16px;
+  margin-left:8px;
+  border-radius:10px;
+}
+.nested-condition .nested-condition{ border-left-color:var(--rail-2); }
+
+/* Connector (AND/OR) row — NO label, its own full row */
+.nested-condition > .field:has(.group-connector),
+.nested-condition > .field.connector-bar{
   display:flex;
-  flex-wrap:wrap;
-  align-items:flex-start;
-  gap:.5rem .75rem;
-  background: var(--row-bg);
+  align-items:center;
+  gap:10px;
+  height:38px;
+  padding:6px 10px;
+  margin:10px 0;
+  background:rgba(94,92,230,.06);
+  border:1px solid rgba(94,92,230,.25);
+  border-left:4px solid var(--rail);
+  border-radius:10px;
+
+  grid-column:1 / -1;
+
+}
+.nested-condition .group-connector,
+.nested-condition .field:has(.group-connector) .select select{
+  width:120px;
+  min-width:120px;
+  max-width:120px;
+}
+
+/* Condition row layout (desktop) */
+.condition-row{
+  position:relative;
+  background:var(--row-bg);
   border:1px solid var(--row-border);
   border-radius:10px;
-  padding:.55rem .65rem; margin-bottom:.6rem;
-  box-shadow:0 1px 0 rgba(0,0,0,.02);
-  z-index:1;
-  transition: box-shadow .15s ease, background .15s ease, border-color .15s ease;
+  padding:.55rem .65rem .55rem .9rem; /* left pad for elbow */
+  margin-bottom:.6rem;
+
+  display:grid !important;
+  grid-template-columns:
+    220px  /* LHS variable */
+    1fr    /* LHS params */
+    80px   /* operator */
+    120px  /* RHS mode */
+    1.4fr  /* RHS (value or variable) */
+    auto   /* delete btn */
+    auto;  /* subgroup trigger button (if any) */
+  gap:8px 12px;
+  align-items:start;
 }
 .condition-row:hover{ box-shadow:0 2px 6px rgba(0,0,0,.06); }
 .condition-row:focus-within{ box-shadow:0 0 0 2px var(--focus-ring); border-color:#cfd4ff; }
 
-/* Desktop sizing */
-.condition-row > .select.mr-2:first-child{ flex:0 0 240px; min-width:220px; }
-.condition-row .condition-parameters{ flex:1 1 320px; min-width:260px; }
-.condition-row .condition-operator{ width:90px; }
-.condition-row .rhs-mode{ width:140px; }
-.condition-row .condition-value{ flex:1 1 200px; min-width:160px; }
-.condition-row .rhs-input{
-  flex:1 1 320px; min-width:260px;
-  display:inline-flex; align-items:center; gap:.4rem;
+/* Keep the elbow line for tree clarity */
+.condition-row::before{
+  content:"";
+  position:absolute;
+  left:0; top:1.2em; width:12px;
+  border-top:2px solid var(--rail);
 }
-.condition-row .delete{ margin-left:.25rem; }
-.condition-row .button.is-small.is-warning{ margin-left:.25rem; }
+.nested-condition .nested-condition .condition-row::before{ border-top-color:var(--rail-2); }
 
-/* Entry/Exit tints */
+/* Children clamp & sizing */
+.condition-row > *{
+  min-width:0 !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+}
+.condition-row .select,
+.condition-row .input,
+.condition-row .textarea,
+.condition-row .select select,
+.condition-row .condition-parameters,
+.condition-row .rhs-input,
+.condition-row .condition-value,
+.condition-row .rhs-cell{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+}
+
+/* Put BOTH RHS variants into SAME grid column */
+.condition-row > .condition-value,
+.condition-row > .rhs-input{
+  grid-column:5 / 6 !important;
+}
+
+/* Force any nested subgroup to start on a NEW full-width row */
+.condition-row > .nested-condition{
+  grid-column:1 / -1 !important;
+  margin-top:.5rem;
+}
+
+/* Action buttons aligned at end */
+.condition-row > .delete,
+.condition-row > .button.is-small{
+  align-self:start; justify-self:end; white-space:nowrap;
+}
+
+/* Entry/Exit tinting */
 [id^="entry_conditions_"] .condition-row{
-  background: var(--entry-bg);
-  border-color: var(--entry-border);
+  background:var(--entry-bg);
+  border-color:var(--entry-border);
 }
 [id^="exit_conditions_"] .condition-row{
-  background: var(--exit-bg);
-  border-color: var(--exit-border);
+  background:var(--exit-bg);
+  border-color:var(--exit-border);
 }
 
-/* Validation highlight */
-.condition-row.highlight-red{
-  border:2px dashed #ff5a5f; background:#fff0f0;
+/* ---------- Select2 clamps ---------- */
+.select2-container{ width:100% !important; max-width:100% !important; min-width:0 !important; }
+.select2-selection{
+  display:flex !important; align-items:center !important;
+  width:100% !important; max-width:100% !important; min-width:0 !important;
+  border:1px solid var(--line) !important; border-radius:10px !important;
+  overflow:hidden !important;
 }
+.select2-selection__rendered{
+  flex:1 1 auto; min-width:0;
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  line-height:2.3rem !important; padding-left:.75rem !important;
+}
+.select2-selection__arrow{
+  position:static; flex:0 0 auto;
+  width:1.6rem; height:2.2rem; display:flex; align-items:center; justify-content:center;
+}
+.select2-dropdown{ max-width:100% !important; border-radius:10px !important; }
 
-/* Expression builder group item */
-.expression-item .field.box{
-  border:1px solid var(--line);
-  border-radius:10px;
-  background: var(--soft);
-}
-
-/* UDV small helper line */
-.udv-header{ margin-bottom:.5rem; }
-#userConstantsContainer .is-size-7{
-  font-style:italic; background:#f4f7ff; padding:.25rem .5rem; border-left:3px solid var(--success);
-}
-
-/* ---------- Legs layout (desktop defaults) ---------- */
-#legsContainer{
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)); /* 2-up on desktop */
-  gap: 1rem;
-}
-#legsContainer .leg-block{
-  grid-column: auto;
-  min-width: 0;
-  box-sizing: border-box;
-}
-/* Big screens: 3-up */
-@media (min-width: 1280px){
-  #legsContainer{
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-/* ===== FINAL DESKTOP-FIRST LEG LAYOUT (outer grid only) ===== */
-
-/* Outer list of legs: 2-up on desktop */
-#legsContainer{
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 1.25rem !important;
-}
-
-/* Each leg card sits in a grid cell; no manual spans */
-#legsContainer .leg-block{
-  grid-column: auto !important;
-  min-width: 0;
-  box-sizing: border-box;
-}
-
-/* ---- REVERT inner leg card to single-column form ---- */
-.box.leg-block{
-  display: block !important;                 /* kill inner grid */
-  grid-template-columns: none !important;    /* neutralize any previous rule */
-  column-gap: 0 !important;
-  row-gap: 0 !important;
-}
-
-.box.leg-block .field{
-  margin-bottom: 1rem !important;            /* restore normal spacing */
-}
-
-.box.leg-block .select,
-.box.leg-block .input,
-.box.leg-block .textarea{
-  width: 100% !important;                    /* full width controls */
-}
-
-/* If you previously added span helpers for Entry/Exit, neutralize them */
-.box.leg-block .field[data-span="2"]{
-  grid-column: auto !important;              /* no effect since display:block */
-}
-
-/* Optional: 3-up on very wide screens */
-@media (min-width: 1280px){
-  #legsContainer{
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
-}
-
-/* ---------- Preview panels ---------- */
-#jsonPreviewBox pre{
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
-  max-height: 45vh;
-  overflow: auto;
-  background: #0b1020;
-  color: #e5e7eb;
-  border-radius: 10px;
-  padding: .75rem 1rem;
-}
-
-/* ---------- Tables ---------- */
-.table-wrapper{
-  width:100%;
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
-  border:1px solid var(--line);
-  border-radius:10px;
-}
-.table{ min-width:640px; }
-
-/* ---------- Notifications & footer ---------- */
-.notification{ border-radius:10px; box-shadow: var(--shadow); }
-footer.footer{
-  background:#eaf7f0; color:#4a4a4a; padding:1rem; text-align:center; font-size:.9rem;
-}
-
-/* ---------- Dark mode (auto) ---------- */
+/* ---------- Dark Mode ---------- */
 @media (prefers-color-scheme: dark){
   :root{
-    --card-bg:#14161a; --card-border:#2a2e37; --card-shadow:0 1px 4px rgba(0,0,0,.5);
-    --leg-accent:#8ea2ff;
+    --card-bg:#14161a; --card-border:#2a2e37; --leg-accent:#8ea2ff;
     --row-bg:#14161a; --row-border:#2a2e37;
     --entry-bg:#101a12; --entry-border:#223a2a;
     --exit-bg:#1a1413; --exit-border:#3a2420;
-    --focus-ring: rgba(134,179,255,.35);
+    --focus-ring:rgba(134,179,255,.35);
   }
-  #basicDetailsSection, #strategySection, #jsonPreviewBox,
-  .box.leg-block, #userConstantsContainer .box{ box-shadow:none; }
+  #basicDetailsSection,#strategySection,#jsonPreviewBox,
+  .box.leg-block,#userConstantsContainer .box{ box-shadow:none; }
   .condition-row:hover{ box-shadow:0 0 0 1px rgba(255,255,255,.04) inset; }
 }
 
-.container{ max-width: 1200px !important; }
-/* Make each leg span the full content width (1 per row) */
-#legsContainer{ grid-template-columns: 1fr !important; }
+/* ---------- Responsive ---------- */
+@media (max-width: 992px){
+  .box.leg-block{ grid-template-columns:1fr !important; }
+  .box.leg-block .fields.is-grouped{ display:block; }
 
-/* Widen the page container so nested conditions have more room */
-.container{ max-width: 1200px !important; }  /* bump as needed: 1200�1600 */
-/* ---- Global password-eye pattern ---- */
-.password-wrapper {
-  position: relative;
+  .condition-row{
+    grid-template-columns:1fr 1fr;
+    grid-auto-flow:row;
+  }
+  .condition-row .rhs-input,
+  .condition-row .condition-value,
+  .condition-row > .nested-condition{
+    grid-column:1 / -1 !important;
+  }
+}
+/* Wrapper styling for strike section */
+.strike-wrapper {
+  border: 1px solid #ddd;        /* light border */
+  border-radius: 8px;            /* smooth corners */
+  padding: 1rem;                 /* inner spacing */
+  margin-bottom: 1rem;           /* space below */
+  background-color: #fafafa;     /* subtle background */
 }
 
-.password-wrapper .input {
-  padding-right: 2.5rem; /* space for the eye */
+/* Space out fields inside strike wrapper */
+.strike-wrapper .field {
+  margin-bottom: 0.75rem;
 }
 
-.password-wrapper .toggle-eye {
+/* Make label slightly smaller and muted */
+.strike-wrapper .label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+/* Dropdown sizing */
+.strike-wrapper .select,
+.strike-wrapper .input {
+  width: 100%;   /* make inputs full width */
+  max-width: 350px; /* but don’t stretch too wide */
+  min-width: 150px;
+}
+
+/* Number input consistency */
+.strike-wrapper input[type="number"] {
+  max-width: 200px;
+   min-width: 150px;
+}
+/* Expiry field styling */
+.field.expiry-field {
+  margin-bottom: 1rem;
+  
+}
+
+.field.expiry-field .label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 0.3rem;
+}
+
+.field.expiry-field .select {
+  width: 100%;
+  max-width: 350px;
+   min-width: 200px;
+}
+/* Repair conditions tint */
+[id^="repair_conditions_"] .condition-row {
+  background: #f6f6ff;              /* light blue/purple shade */
+  border-color: #d6d6f5;
+}
+
+/* Universal Exit conditions tint */
+[id^="universal_exit_conditions_"] .condition-row {
+  background: #fffbe6;              /* light yellow shade */
+  border-color: #ffe58f;
+}
+
+/* Red "X" buttons for all delete actions */
+.condition-row > .delete,
+.nested-condition .delete,
+.leg-block .delete {
+  background-color: var(--danger) !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+  width: 1.2rem;
+  height: 1.2rem;
+  min-width: 1.2rem;
+  min-height: 1.2rem;
+}
+
+.condition-row > .delete:hover,
+.nested-condition .delete:hover,
+.leg-block .delete:hover {
+  background-color: #b91c1c !important; /* darker red on hover */
+}
+
+/* 🔴 Leg-level delete button */
+.leg-block .leg-delete-btn {
   position: absolute;
-  right: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 10px;
+  right: 10px;
+
+  background-color: var(--danger) !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+
+  width: 1.4rem;
+  height: 1.4rem;
+  min-width: 1.4rem;
+  min-height: 1.4rem;
+
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
   cursor: pointer;
-  color: #a0a0a0;
-  line-height: 1;
+  z-index: 2;
 }
 
-.password-wrapper .toggle-eye:hover {
-  color: #363636;
+.leg-block .leg-delete-btn:hover {
+  background-color: #b91c1c !important; /* darker red */
 }
+
+/* Force condition sections to span full row */
+.box.leg-block .field:has([id^="entry_conditions_"]),
+.box.leg-block .field:has([id^="exit_conditions_"]),
+.box.leg-block .field:has([id^="repair_conditions_"]),
+.box.leg-block .field:has([id^="universal_exit_conditions_"]),
+.box.leg-block .field[data-span="full"],
+.box.leg-block .field.is-fullwidth {
+  grid-column: 1 / -1 !important;
+}
+

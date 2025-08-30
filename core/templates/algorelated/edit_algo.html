@@ -50,7 +50,7 @@ Created on Tue Aug  5 23:18:49 2025
 <body>
 
 <section class="section">
-  <div class="container">
+  <div class="container container--wide ">
     <h1 class="title">Add New Algorithm</h1>
 
     
@@ -123,6 +123,8 @@ Created on Tue Aug  5 23:18:49 2025
 {{ symbol_list_json|json_script:"symbols-data" }}
 {{ user_vars_json|json_script:"user-vars-data" }}
 {{ legs_json|json_script:"legs-data" }}
+{{ rules_json|json_script:"rules-data" }}
+
 
 <script>
 // 1) Expose the raw JSON directly to JS variables (no parsing needed in utils.js)
@@ -132,9 +134,8 @@ Created on Tue Aug  5 23:18:49 2025
  window.indicators           = {{ indicators_json|safe }};
   window.all_symbols          = {{ symbol_list_json|safe }};
   window.userDefinedVariables = {{ user_vars_json|safe }};
-  window.legs                 = {{ legs_json|safe }};
-  window.symbolList = {{ symbol_list_json|safe }};
-  
+window.Legs                 = JSON.parse(document.getElementById("legs-data").textContent);
+window.initialRules         = JSON.parse(document.getElementById("rules-data").textContent);
 // 2) Expose the edit‐mode flag
 window.isEditMode   = {{ is_edit_mode|yesno:"true,false" }};
 window.userVars = {{ user_vars_json|safe }};

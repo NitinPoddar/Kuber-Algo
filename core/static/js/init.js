@@ -9,62 +9,96 @@ document.addEventListener('change', function (e) {
 
 
 
-form.addEventListener("submit", function () {
-  // 1) Clean prior hidden fields so we don't stack them
-  // Normalize OTM targets: convert "__custom__" to the number from the sibling input
+form.addEventListener("submit", function (e) {
+  let hasError = false;
+
+  // Normalize + validate + ensure hidden inputs for strike_target[]
   document.querySelectorAll('.leg-block').forEach((block, idx) => {
     const kind   = document.getElementById(`strike_kind_${idx}`)?.value;
-    if (kind !== 'OTM') return;
-
     const sel    = document.getElementById(`strike_target_${idx}`);
     const custom = document.getElementById(`strike_target_custom_${idx}`);
     if (!sel) return;
 
-    // If user chose custom, push the number into the select so backend gets a real value
-    if (sel.value === '__custom__' && custom && custom.value.trim() !== '') {
-      // Write the number into a hidden input named strike_target[]
-      // (or just overwrite the select value if you prefer)
-      sel.value = custom.value.trim();
+    let finalValue = "";
+    if (kind === "OTM") {
+      if (sel.value === "__custom__" && custom?.value.trim() !== "") {
+        finalValue = custom.value.trim();
+        sel.value = finalValue;  
+      } else {
+        finalValue = sel.value || "";
+      }
+
+      // 🔍 Validation
+      if (!finalValue) {
+        alert(`Leg ${idx + 1}: OTM target must be provided`);
+        hasError = true;
+      } else if (!( /^\d+$/.test(finalValue) || /^[A-Za-z_][A-Za-z0-9_]*$/.test(finalValue) )) {
+        alert(`Leg ${idx + 1}: OTM target must be a number or a valid variable name`);
+        hasError = true;
+      }
     }
+
+    // ✅ Ensure hidden strike_target[] field always present
+    let hidden = block.querySelector("input[type=hidden][name='strike_target[]']");
+    if (!hidden) {
+      hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = "strike_target[]";
+      block.appendChild(hidden);
+    }
+    hidden.value = finalValue;
   });
 
-  
-  form.querySelectorAll('input[name^="entry_conditions_json_"], input[name^="exit_conditions_json_"]')
-      .forEach(n => n.remove());
+  if (hasError) {
+    e.preventDefault(); // stop submit if any error
+    return false;
+  }
 
-  // 2) Serialize current DOM -> hidden inputs
-  const legBlocks = document.querySelectorAll('.leg-block');
-  legBlocks.forEach((_, idx) => {
-    const entry = extractConditions(document.getElementById(`entry_conditions_${idx}`));
-    const exit  = extractConditions(document.getElementById(`exit_conditions_${idx}`));
+  // Remove prior hidden inputs for rules
+  form.querySelectorAll('input[name="rules_json"]').forEach(n => n.remove());
 
-    const entryInput = document.createElement('input');
-    entryInput.type = 'hidden';
-    entryInput.name = `entry_conditions_json_${idx}`;
-    entryInput.value = JSON.stringify(entry);
-    form.appendChild(entryInput);
+  const rules = [];
+  const legBlocks = document.querySelectorAll(".leg-block");
+  legBlocks.forEach((block, idx) => {
+    const legId = block.dataset.legId || null;
 
-    const exitInput = document.createElement('input');
-    exitInput.type = 'hidden';
-    exitInput.name = `exit_conditions_json_${idx}`;
-    exitInput.value = JSON.stringify(exit);
-    form.appendChild(exitInput);
-  });
-});
+    [
+      {type: "ENTRY", el: `entry_conditions_${idx}`, action: "PLACE_ORDER"},
+      {type: "EXIT", el: `exit_conditions_${idx}`, action: "CLOSE_POSITION"},
+      {type: "REPAIR", el: `repair_conditions_${idx}`, action: "MODIFY_ORDER"},
+      {type: "UNIVERSAL_EXIT", el: `universal_exit_conditions_${idx}`, action: "CLOSE_ALL"}
+    ].forEach(cfg => {
+      const condEl = document.getElementById(cfg.el);
+      if (!condEl) return;
 
-$(function () {
-  $(document).on('mouseenter', '.constant-builder', function () {
-    $(this).sortable({
-      axis: 'x',
-      items: '> .constant-item',
-      handle: '.handle',
-      placeholder: 'drag-placeholder',
-      tolerance: 'pointer'
+      const tree = extractConditions(condEl);
+      if (!tree || !tree.conditions || tree.conditions.length === 0) return;
+
+      rules.push({
+        leg_index: idx,
+        leg_id: legId,
+        rule_type: cfg.type,
+        scope: cfg.type === "UNIVERSAL_EXIT" ? "ALGO" : "LEG",
+        trigger_event: "ON_CONDITION",
+        priority: cfg.type === "UNIVERSAL_EXIT" ? 10 : 50,
+        condition_tree: tree,
+        action_type: cfg.action,
+        action_params: {},
+        policy: { repeatable: true }
+      });
     });
   });
-});
 
-function restoreLegTargetUDV(idx, leg) {
+  // Append one hidden input with all rules
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "rules_json";
+  input.value = JSON.stringify(rules);
+  form.appendChild(input);
+});   // ✅ only this one closes the addEventListener
+
+
+window.restoreLegTargetUDV=function (idx, leg) {
   // ensure options exist
   if (typeof refreshStrikeTargetUDVOptionsFor === 'function') {
     refreshStrikeTargetUDVOptionsFor(idx);
@@ -92,8 +126,6 @@ function restoreLegTargetUDV(idx, leg) {
 }
 
 
-
-
 document.addEventListener("DOMContentLoaded", function () {
   const algoNameInput = document.getElementById("AlgoName");
   const fundInput = document.getElementById("MinimumFund");
@@ -115,24 +147,33 @@ document.addEventListener("DOMContentLoaded", function () {
       algoNameInput.classList.add("is-danger");
       return;
     }
-
-    
   }
 
   // Attach validation listeners
   algoNameInput.addEventListener("input", validateFields);
   fundInput.addEventListener("input", validateFields);
 
+  if (window.isEditMode) {
+  const strategySection = document.getElementById("strategySection");
+if (strategySection) {
+  strategySection.style.display = "block";
+  strategySection.classList.remove("is-hidden"); // if using Bulma
+}
 
-   if (window.isEditMode) {
-     const legsFromServer = Array.isArray(window.initialLegs) ? window.initialLegs : initialLegs;
- 
-     legsFromServer.forEach((leg, idx) => {
-       addLeg();
- toggleStrikeMode(idx);
+const defineBtn = document.getElementById("defineStrategyBtn");
+if (defineBtn) {
+  defineBtn.style.display = "none"; // optional: hide the button in edit mode
+}
+
+    const legsFromServer = Array.isArray(window.Legs) ? window.Legs : Legs;
+
+    // --- Restore legs ---
+    legsFromServer.forEach((leg, idx) => {
+      addLeg();
+      toggleStrikeMode(idx);
       const legBlock = document.querySelectorAll('.leg-block')[idx];
 
-      // 1) Segment first
+      // 1) Segment
       const segSel = document.getElementById(`segment_${idx}`);
       if (segSel) {
         segSel.value = leg.exchange_segment || 'NFO';
@@ -140,10 +181,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       // 2) Instrument
-      const instSel = document.getElementById(`instrument_${idx}`);
-      if (instSel) {
-        $(instSel).val(leg.instrument_name).trigger('change'); // keep Select2 behavior
-      }
+      restoreInstrument(idx, leg.instrument_name);
 
       setTimeout(() => {
         // 3) Expiry/Strike
@@ -159,24 +197,55 @@ document.addEventListener("DOMContentLoaded", function () {
         if (lotQtyEl) lotQtyEl.value = leg.lot_qty || 1;
 
         // 5) Strike mode/target
-const kindSel = document.getElementById(`strike_kind_${idx}`);
-if (kindSel) { kindSel.value = leg.strike_kind || 'ABS'; toggleStrikeMode(idx); }
-// initial attempt (works if UDVs already loaded)
-restoreLegTargetUDV(idx, leg);
+        const kindSel = document.getElementById(`strike_kind_${idx}`);
+        if (kindSel) {
+          kindSel.value = leg.strike_kind || 'ABS';
+          toggleStrikeMode(idx);
+        }
+         if (typeof restoreLegTargetUDV === 'function') {
+            restoreLegTargetUDV(idx, leg);
+            }
         // 6) Other dropdowns
         legBlock.querySelector(`select[name='option_type[]']`).value = leg.option_type;
         legBlock.querySelector(`select[name='order_direction[]']`).value = leg.order_direction;
         legBlock.querySelector(`select[name='order_type[]']`).value = leg.order_type;
 
-        // 7) Conditions (unchanged)
-        restoreConditionTree(`entry_conditions_${idx}`, leg.entry_conditions);
-        restoreConditionTree(`exit_conditions_${idx}`, leg.exit_conditions);
-      }, 300);
-     });
-   }
+        // 7) (conditions restored separately below)
+      }, 500);
+    }); // ✅ close forEach here
 
+    // --- Restore rules (outside forEach, run once) ---
+     setTimeout(() => {if (Array.isArray(window.initialRules)) {
+      window.initialRules.forEach(rule => {
+        let legIndex = 0;
+if (rule.scope === "LEG") {
+  if (rule.leg_index != null) {
+    legIndex = rule.leg_index;
+  } else if (rule.leg_id) {
+    legIndex = window.Legs.findIndex(l => l.id === rule.leg_id);
+    if (legIndex === -1) legIndex = 0;
+  }
+}
 
+        let containerId = null;
+
+        switch (rule.rule_type) {
+          case "ENTRY": containerId = `entry_conditions_${legIndex}`; break;
+          case "EXIT": containerId = `exit_conditions_${legIndex}`; break;
+          case "REPAIR": containerId = `repair_conditions_${legIndex}`; break;
+          case "UNIVERSAL_EXIT": containerId = `universal_exit_conditions_${legIndex}`; break;
+        }
+
+        if (containerId && rule.condition_tree) {
+         const tree = rule.condition_tree;
+          restoreConditionTree(containerId, tree.conditions || [], tree.connector || "AND");
+        }
+      });
+    }
+  },500);
+  }
 });
+
 
 
 function initSelect2(element, placeholder = "Search...") {
@@ -238,6 +307,22 @@ document.addEventListener("DOMContentLoaded", preloadUserDefinedVariables);
 // Retry restoring Target after UDVs are (re)loaded
 document.addEventListener('udv:changed', () => {
   if (!window.isEditMode) return;
-  const legsFromServer = Array.isArray(window.initialLegs) ? window.initialLegs : window.initialLegs || [];
+  const legsFromServer = Array.isArray(window.Legs) ? window.Legs : window.Legs || [];
   legsFromServer.forEach((leg, idx) => restoreLegTargetUDV(idx, leg));
 });
+
+function restoreInstrument(idx, symbol, retries = 5) {
+  const instSel = document.getElementById(`instrument_${idx}`);
+  if (!instSel) return;
+
+  const optExists = [...instSel.options].some(o => o.value === symbol);
+  if (optExists) {
+    $(instSel).val(symbol).trigger('change');
+    console.log(`Instrument restored for leg ${idx}:`, symbol);
+  } else if (retries > 0) {
+    console.log(`Retrying instrument restore for leg ${idx}...`);
+    setTimeout(() => restoreInstrument(idx, symbol, retries - 1), 200);
+  } else {
+    console.warn(`Failed to restore instrument for leg ${idx}:`, symbol);
+  }
+}

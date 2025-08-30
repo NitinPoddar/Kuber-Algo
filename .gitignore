@@ -33,3 +33,13 @@ Thumbs.db
 
 # === Git Backup Files ===
 *.orig
+# === Django Migrations Cache ===
+*/migrations/__pycache__/
+
+# Optional: ignore initial migrations if you plan to recreate
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# === Environment ===
+.env
+.env.*

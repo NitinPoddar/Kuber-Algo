@@ -2,7 +2,7 @@
 FROM python:3.11-slim
 
 # Set workdir
-WORKDIR /code
+WORKDIR /app
 
 # Install system deps (for psycopg2 and others)
 RUN apt-get update && apt-get install -y \
