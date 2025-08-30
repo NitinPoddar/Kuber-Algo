@@ -1,10 +1,16 @@
 # === Python/Django ===
 __pycache__/
 *.py[cod]
-*.sqlite3
 *.log
 *.pot
 *.mo
+
+# === SQLite / Local Databases ===
+*.sqlite3
+*.sqlite
+*.db
+db.sqlite3
+backup_sqlite.json
 
 # === Virtual Environments ===
 venv/
@@ -33,13 +39,3 @@ Thumbs.db
 
 # === Git Backup Files ===
 *.orig
-# === Django Migrations Cache ===
-*/migrations/__pycache__/
-
-# Optional: ignore initial migrations if you plan to recreate
-# */migrations/*.py
-# !*/migrations/__init__.py
-
-# === Environment ===
-.env
-.env.*

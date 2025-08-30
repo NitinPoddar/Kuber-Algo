@@ -1,0 +1,13 @@
+# Default: normalize all text files to LF
+* text=auto eol=lf
+
+# Binary files - don’t change line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.pyc binary
+*.sqlite3 binary
