@@ -67,17 +67,17 @@ h1.title{ font-weight: 700; letter-spacing: -0.02em; }
 .navbar{ box-shadow: 0 2px 10px rgba(2,6,23,.05); }
 .navbar .navbar-item,
 .navbar .navbar-link{color: #000; }
-.navbar-item.has-text-black{
+.navbar-item.has-text-white{
   font-family: "Poppins", sans-serif;
   font-weight: 500;
   letter-spacing: .3px;
-  color: #000 !important;
+  color: #100 !important;
 }
 .navbar-item.has-text-white:hover{ background:#000; }
 .navbar-burger{ height: 3rem; width: 3rem; }
 .navbar-menu{ backdrop-filter: saturate(140%) blur(6px); }
 .navbar-link user-dropdown-trigger has-text-white{color: #000}
- .navbar-link user-dropdown-trigger {color: #000}           
+.navbar-link user-dropdown-trigger {color: #000}           
 .user-dropdown-trigger{
   border-radius: 999px;
   background:#000;
@@ -88,7 +88,7 @@ h1.title{ font-weight: 700; letter-spacing: -0.02em; }
   font-family:"Poppins", sans-serif;
   display:flex; align-items:center; gap:5px;
 }
-.user-dropdown-trigger:hover{background:#00795c; }
+.user-dropdown-trigger:hover{background:#000; }
 .user-dropdown-item{ font-size:.85rem; }
 
 /* ---------- Cards & Sections ---------- */
