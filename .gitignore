@@ -12,6 +12,13 @@ __pycache__/
 db.sqlite3
 backup_sqlite.json
 
+# === Postgres (local containers / dumps) ===
+pgdata/
+postgres_data/
+*.sql
+*.dump
+*.backup
+
 # === Virtual Environments ===
 venv/
 env/
